@@ -1,38 +1,41 @@
-.App {
-  text-align: center;
+/* Styles for the waveform wrapper */
+.waveform-wrapper {
+  position: relative;
+  width: 100%;
+  height: 60px; /* Adjust height to suit your design */
+  background-color: #f1f5f9; /* Light gray background for visibility */
+  border-radius: 8px;
+  overflow: hidden;
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
-}
-
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
+/* Placeholder waveform bars */
+/* .placeholder-waveform {
   display: flex;
-  flex-direction: column;
-  align-items: center;
+  gap: 2px;
   justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
+  align-items: center;
+  height: 100%;
+  opacity: 0.5; 
+  pointer-events: none;
+  
+} */
+
+.placeholder-waveform {
+  background: repeating-linear-gradient(
+    to right,
+    #e0e0e0,
+    #bc6969 2px,
+    #ffffff 2px,
+    #7d93ba 6px
+  );
+  opacity: 0.5; /* Make it semi-transparent */
 }
 
-.App-link {
-  color: #61dafb;
-}
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.placeholder-bar {
+  background-color: #3b82f6;
+  width: 3px; /* Adjust width as needed */
+  border-radius: 2px;
+  /* Variable height for a waveform look */
+  height: calc(10px + 20 * (var(--random-factor, 1)));
 }
