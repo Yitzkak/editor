@@ -66,78 +66,78 @@ const Toolbar = ({
   
 
   return (
-    <div className="flex items-center space-x-6 p-2 bg-white rounded-lg shadow-md border">
+    <div className="flex items-center space-x-6 p-1 bg-white rounded-lg shadow-md border">
       {/* Play/pause icon */}
-      <button onClick={togglePlayPause} className="text-gray-600 p-2 hover:text-blue-500" title="Play/Pause">
-        <PiPlayPauseBold size={23} />
+      <button onClick={togglePlayPause} className="text-gray-600 p-1 hover:text-blue-500" title="Play/Pause">
+        <PiPlayPauseBold size={21} />
       </button>
       
       {/* Go to start of audio icon */}
-      <button onClick={goToStart} className="text-gray-600 p-2 hover:text-blue-500 border-b-2 border-yellow-500" title="Go to start of audio">
-        <TbPlayerSkipBack size={23} />
+      <button onClick={goToStart} className="text-gray-600 p-1 hover:text-blue-500 border-b-2 border-yellow-500" title="Go to start of audio">
+        <TbPlayerSkipBack size={21} />
       </button>
       
       {/* Skipback icon */}
-      <button onClick={skipBack} className="text-gray-600 p-2 hover:text-blue-500" title="Skipback 5s">
-        <TbPlayerTrackPrev size={23} />
+      <button onClick={skipBack} className="text-gray-600 p-1 hover:text-blue-500" title="Skipback 5s">
+        <TbPlayerTrackPrev size={21} />
       </button>
       
       {/* Skipforward icon */}
-      <button onClick={skipForward} className="text-gray-600 p-2 hover:text-blue-500" title="Skipforward 5s">
-        <TbPlayerTrackNext size={23} />
+      <button onClick={skipForward} className="text-gray-600 p-1 hover:text-blue-500" title="Skipforward 5s">
+        <TbPlayerTrackNext size={21} />
       </button>
       
       {/* Go to end of audio icon */}
-      <button onClick={goToEnd} className="text-gray-600 p-2 hover:text-blue-500" title="Go to end of audio icon">
-        <TbPlayerSkipForward size={23} />
+      <button onClick={goToEnd} className="text-gray-600 p-1 hover:text-blue-500" title="Go to end of audio icon">
+        <TbPlayerSkipForward size={21} />
       </button>
 
       {/* Volume down icon */}
-      <button onClick={decreaseVolume} disabled={volume === 0} className="text-gray-600 p-2 hover:text-blue-500" title="Volume down">
-        <TbVolume2 size={23} />
+      <button onClick={decreaseVolume} disabled={volume === 0} className="text-gray-600 p-1 hover:text-blue-500" title="Volume down">
+        <TbVolume2 size={21} />
       </button>
       {/* Volume up icon */}
-      <button onClick={increaseVolume} disabled={volume === 1} className="text-gray-600 p-2 hover:text-blue-500" title="Volume up">
-        <TbVolume size={23} />
+      <button onClick={increaseVolume} disabled={volume === 1} className="text-gray-600 p-1 hover:text-blue-500" title="Volume up">
+        <TbVolume size={21} />
       </button>
 
       {/* Display current time*/}
       <span className="bg-white p-1 text-gray-600 rounded-sm border ">Time: {formatTime(currentTime)}</span>
 
       {/* Add timestamp icon */}
-      <button onClick={handleTimestamp} className="text-gray-600 p-2 hover:text-blue-500" title="Add timestamp">
-        <MdMoreTime size={23} />
+      <button onClick={handleTimestamp} className="text-gray-600 p-1 hover:text-blue-500" title="Add timestamp">
+        <MdMoreTime size={21} />
       </button>
 
 
       {/* Increase font icon */}
-      <button onClick={increaseFontSize} className="text-gray-600 p-2 hover:text-blue-500" title="Increase font">
-        <FiZoomIn size={23} />
+      <button onClick={increaseFontSize} className="text-gray-600 p-1 hover:text-blue-500" title="Increase font">
+        <FiZoomIn size={21} />
       </button>
 
       {/* Decrease font icon */}
-      <button onClick={decreaseFontSize} className="text-gray-600 p-2 hover:text-blue-500" title="Decrease font">
-        <FiZoomOut size={23} />
+      <button onClick={decreaseFontSize} className="text-gray-600 p-1 hover:text-blue-500" title="Decrease font">
+        <FiZoomOut size={21} />
       </button>
       
       {/* Save icon */}
-      <button className="text-gray-600 p-2  hover:text-blue-500" title="Save">
-        <FiSave size={23} />
+      <button className="text-gray-600 p-1  hover:text-blue-500" title="Save">
+        <FiSave size={21} />
       </button>
       
       {/* Search icon */}
-      <button onClick={toggleFindReplace} className="text-gray-600 p-2 hover:text-blue-500" title="Find & Replace">
-        <RiFindReplaceLine size={23} />
+      <button onClick={toggleFindReplace} className="text-gray-600 p-1 hover:text-blue-500" title="Find & Replace">
+        <RiFindReplaceLine size={21} />
       </button>
 
       {/* Download icon */}
-      <button onClick={downloadTranscript} className="text-gray-600 p-2 hover:text-blue-500" title="Download">
-        <FiDownload size={23} />
+      <button onClick={downloadTranscript} className="text-gray-600 p-1 hover:text-blue-500" title="Download">
+        <FiDownload size={21} />
       </button>
 
       {/* Upload icon (triggers file input) */}
-      <button onClick={handleUploadClick} className="text-gray-600 p-2 hover:text-blue-500" title="Upload an audio file">
-        <RiFileUploadLine size={23} />
+      <button onClick={handleUploadClick} className="text-gray-600 p-1 hover:text-blue-500" title="Upload an audio file">
+        <RiFileUploadLine size={21} />
       </button>
       
       {/* Hidden file input for audio upload */}
@@ -150,8 +150,8 @@ const Toolbar = ({
       />
       
       {/* More options icon */}
-      <button className="text-gray-600 p-2 hover:text-blue-500" title="More Options">
-        <FiMoreHorizontal size={23} />
+      <button className="text-gray-600 p-1 hover:text-blue-500" title="More Options">
+        <FiMoreHorizontal size={21} />
       </button>
     </div>
   );
