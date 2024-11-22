@@ -39,7 +39,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
       alert('Whole word not found.');
     }
   };
-  
+
   const replaceText = (findText, replaceText) => {
     if (!quillInstanceRef.current) return;
   
@@ -73,7 +73,6 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
     }
   };
   
-
   // Expose the `insertTimestamp` method to the parent component
   useImperativeHandle(ref, () => ({
     insertTimestamp,
@@ -100,7 +99,6 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
     // Set fixed height and custom font
     const editorContainer = editorRef.current.querySelector('.ql-editor'); // Access the Quill editor content
     if (editorContainer) {
-      editorContainer.style.height = '600px'; // Set fixed height
       editorContainer.style.font = `${fontSize}px "Poppins", sans-serif`; // Set font size and family
       editorContainer.style.padding = '20px'; // Set padding to 0
       editorContainer.style.lineHeight = '30px'; // Adjust line height for better readability
@@ -137,11 +135,11 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
   }, [fontSize]);
 
   return (
-    <div className="w-full h-[600px] shadow-lg border">
+    <div className="w-full h-[500px] shadow-lg border">
       {/* Quill editor container */}
       <div
         ref={editorRef}
-        className="font-poppins bg-white rounded-md p-4 overflow-y-auto break-words whitespace-pre-wrap"
+        className="font-poppins bg-white rounded-md p-4 h-full break-words whitespace-pre-wrap"
       ></div>
     </div>
   );

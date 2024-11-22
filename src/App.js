@@ -102,7 +102,7 @@ function App() {
 
 
   return (
-    <div className="flex justify-center min-w-96 min-h-[45.5rem] bg-gray-100 p-4" >
+    <div className="flex justify-center min-w-96  bg-gray-100 p-4" >
       <div className="flex flex-col max-h-full items-center w-full max-w-6xl p-4 rounded-sm">
         {/* Audio player at the top */}
         <div className="w-full">
