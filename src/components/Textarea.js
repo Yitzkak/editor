@@ -135,11 +135,11 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
   }, [fontSize]);
 
   return (
-    <div className="w-full h-[500px] shadow-lg border">
+    <div className="w-full h-[460px] shadow-lg border">
       {/* Quill editor container */}
       <div
         ref={editorRef}
-        className="font-poppins bg-white rounded-md p-4 h-full break-words whitespace-pre-wrap"
+        className="font-poppins bg-white rounded-md h-full break-words whitespace-pre-wrap"
       ></div>
     </div>
   );
