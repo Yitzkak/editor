@@ -75,7 +75,7 @@ const Toolbar = ({
       </button>
       
       {/* Go to start of audio icon */}
-      <button onClick={goToStart} className="text-gray-600 p-1 hover:text-blue-500 border-b-2 border-yellow-500" title="Go to start of audio">
+      <button onClick={goToStart} className="text-gray-600 p-1 hover:text-blue-500" title="Go to start of audio">
         <TbPlayerSkipBack size={21} />
       </button>
       
