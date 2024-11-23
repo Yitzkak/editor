@@ -50,6 +50,8 @@ const Toolbar = ({
     document.body.removeChild(element); // Clean up
   };
 
+  
+
   const handleTimestamp = () => {
     const timestamp = onGetTimestamp(); // This comes from `App.js` via props
     onInsertTimestamp(timestamp); // Pass timestamp to `Textarea` handler
@@ -68,7 +70,7 @@ const Toolbar = ({
   return (
     <div className="flex items-center space-x-6 p-1 bg-white rounded-lg shadow-md border">
       {/* Play/pause icon */}
-      <button onClick={togglePlayPause} className="text-gray-600 p-1 hover:text-blue-500" title="Play/Pause">
+      <button onClick={togglePlayPause} className="text-gray-600 p-1 hover:text-blue-500" title="Play/Pause (Shift + Tab)">
         <PiPlayPauseBold size={21} />
       </button>
       
@@ -78,12 +80,12 @@ const Toolbar = ({
       </button>
       
       {/* Skipback icon */}
-      <button onClick={skipBack} className="text-gray-600 p-1 hover:text-blue-500" title="Skipback 5s">
+      <button onClick={skipBack} className="text-gray-600 p-1 hover:text-blue-500" title="Skipback 5s (Shift + Arrow Left)">
         <TbPlayerTrackPrev size={21} />
       </button>
       
       {/* Skipforward icon */}
-      <button onClick={skipForward} className="text-gray-600 p-1 hover:text-blue-500" title="Skipforward 5s">
+      <button onClick={skipForward} className="text-gray-600 p-1 hover:text-blue-500" title="Skipforward 5s (Shift + Arrow Right)">
         <TbPlayerTrackNext size={21} />
       </button>
       
@@ -105,7 +107,7 @@ const Toolbar = ({
       <span className="bg-white p-1 text-gray-600 rounded-sm border ">Time: {formatTime(currentTime)}</span>
 
       {/* Add timestamp icon */}
-      <button onClick={handleTimestamp} className="text-gray-600 p-1 hover:text-blue-500" title="Add timestamp">
+      <button onClick={handleTimestamp} className="text-gray-600 p-1 hover:text-blue-500" title="Add timestamp (Ctrl + Shift)">
         <MdMoreTime size={21} />
       </button>
 

@@ -100,6 +100,43 @@ function App() {
     }
   };
 
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Check for specific key combinations and call corresponding functions
+      if (e.shiftKey && e.code === "Tab") {
+        e.preventDefault(); // Prevent default tabbing behavior
+        togglePlayPause(); // Play/Pause
+      }
+  
+      if (e.ctrlKey && e.shiftKey && e.code === "ControlLeft" || e.code === "ControlRight") {
+        e.preventDefault();
+        const timestamp = getTimestamp();
+        if (timestamp) {
+          insertTimestamp(timestamp); // Insert Timestamp
+        }
+      }
+  
+      if (e.shiftKey && e.code === "ArrowLeft") {
+        e.preventDefault(); // Prevent default behavior
+        skipBack(); // Skip Backwards
+      }
+  
+      if (e.shiftKey && e.code === "ArrowRight") {
+        e.preventDefault(); // Prevent default behavior
+        skipForward(); // Skip Forwards
+      }
+    };
+  
+    // Attach the event listener
+    window.addEventListener("keydown", handleKeyDown);
+  
+    // Cleanup the listener on component unmount
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [togglePlayPause, getTimestamp, insertTimestamp, skipBack, skipForward]);
+  
+
 
   return (
     <div className="flex justify-center min-w-96  bg-gray-100 p-[5px]" >

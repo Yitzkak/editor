@@ -14,7 +14,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
     if (range) {
       // Check if it's the start of a paragraph
       const isStartOfParagraph = range.index === 0 || quillInstanceRef.current.getText(range.index - 1, 1) === "\n";
-      const formattedTimestamp = isStartOfParagraph ? `${timestamp} S1:` : `[${timestamp}] ____ `;
+      const formattedTimestamp = isStartOfParagraph ? `${timestamp} S1: ` : `[${timestamp}] ____ `;
 
       // Insert the timestamp at the selection index
       quillInstanceRef.current.insertText(range.index, formattedTimestamp);
