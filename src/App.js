@@ -1,5 +1,5 @@
 // App.js
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Toolbar from './components/Toolbar';
 import Textarea from './components/Textarea';
 import AudioPlayer from './components/AudioPlayer';
@@ -14,13 +14,17 @@ function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [findText, setFindText] = useState("");
   const [replaceText, setReplaceText] = useState("");
-  const [text, setText] = useState(
-    "Sample text to demonstrate find and replace functionality."
-  );
+  const [amplification, setAmplification] = useState(1);
 
   const [currentTime, setCurrentTime] = useState(0);
   const editorRef = useRef(null);
   const audioPlayerRef = useRef(null);
+
+  const handleAmplificationChange = (e) => {
+    const value = parseFloat(e.target.value);
+    setAmplification(value);
+    audioPlayerRef.current.updateAmplification(value);
+  };
 
   // Function to handle file selection
   const handleFileUpload = (file) => {
@@ -76,7 +80,6 @@ function App() {
     return () => clearInterval(interval); // Cleanup the interval on component unmount
   }, []);
   
-
   // Toggle Modal
   const toggleFindReplace = () => {
     setIsModalOpen(!isModalOpen);
@@ -135,11 +138,9 @@ function App() {
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [togglePlayPause, getTimestamp, insertTimestamp, skipBack, skipForward]);
-  
-
 
   return (
-    <div className="flex justify-center min-w-96  bg-gray-100 p-[5px]" >
+    <div className="flex justify-center min-w-96  bg-gray-100 p-[5px] h-screen" >
       <div className="flex flex-col max-h-full items-center w-full max-w-6xl rounded-sm">
         {/* Audio player at the top */}
         <div className="w-full">
@@ -165,6 +166,8 @@ function App() {
             onGetTimestamp={getTimestamp}
             onInsertTimestamp={insertTimestamp}
             toggleFindReplace={toggleFindReplace}
+            handleAmplificationChange={handleAmplificationChange}
+            amplification={amplification}
           />
         </div>
 

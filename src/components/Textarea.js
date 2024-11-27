@@ -101,10 +101,11 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
     if (editorContainer) {
       editorContainer.style.font = `${fontSize}px "Poppins", sans-serif`; // Set font size and family
       editorContainer.style.padding = '20px'; // Set padding to 0
-      editorContainer.style.lineHeight = '30px'; // Adjust line height for better readability
+      editorContainer.style.setProperty('line-height', '35px', 'important'); // Adjust line height for better readability
       editorContainer.style.overflowY = 'auto'; // Enable vertical scrolling
       editorContainer.style.whiteSpace = 'pre-wrap'; // Preserve newlines and wrap text
       editorContainer.style.wordBreak = 'break-word'; // Break long words into the next line
+      editorContainer.style.wordSpacing = '12px'; 
     }
 
     // Load the saved transcript from localStorage if available
@@ -139,7 +140,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
       {/* Quill editor container */}
       <div
         ref={editorRef}
-        className="font-poppins bg-white rounded-md h-full break-words whitespace-pre-wrap"
+        className="font-poppins bg-white rounded-md h-full break-words word-space-2 whitespace-pre-wrap"
       ></div>
     </div>
   );

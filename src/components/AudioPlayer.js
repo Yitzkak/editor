@@ -2,7 +2,7 @@ import React, { useEffect, useRef, forwardRef, useImperativeHandle } from 'react
 import WaveSurfer from 'wavesurfer.js';
 import "../App.css";
 
-const AudioPlayer = forwardRef(({ audioFile, volume }, ref) => {
+const AudioPlayer = forwardRef(({ audioFile, volume, amplification = 1 }, ref) => {
   const waveformRef = useRef(null);
   const wavesurfer = useRef(null);
   const gainNode = useRef(null); // Gain node for volume boost
@@ -19,6 +19,18 @@ const AudioPlayer = forwardRef(({ audioFile, volume }, ref) => {
         barRadius: 2,
         barHeight: 5,
         backend: 'WebAudio',
+      });
+
+      wavesurfer.current.on("ready", () => {
+        const backend = wavesurfer.current.backend;
+        if (backend && backend.ac) {
+          const audioContext = backend.ac;
+          gainNode.current = audioContext.createGain();
+          backend.setFilter(gainNode.current);
+          updateAmplification(amplification); // Initialize with provided amplification
+        } else {
+          console.error("WaveSurfer backend or AudioContext is not available.");
+        }
       });
 
       // Create an element to display the time
@@ -100,6 +112,12 @@ const AudioPlayer = forwardRef(({ audioFile, volume }, ref) => {
     }
   }, [volume]); 
 
+  const updateAmplification = (factor) => {
+    if (gainNode.current) {
+      gainNode.current.gain.value = factor;
+    }
+  };
+
   // Methods exposed to parent
   useImperativeHandle(ref, () => ({
     togglePlayPause: () => {
@@ -175,6 +193,7 @@ const AudioPlayer = forwardRef(({ audioFile, volume }, ref) => {
       }
       return "0:00:00.0";
     },
+    updateAmplification,
   }));
 
   return (

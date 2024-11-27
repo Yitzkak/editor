@@ -23,7 +23,9 @@ const Toolbar = ({
   currentTime,
   onGetTimestamp,
   onInsertTimestamp,
-  toggleFindReplace
+  toggleFindReplace,
+  handleAmplificationChange,
+  amplification
 }) => {
   const fileInputRef = useRef(null);
 
@@ -102,6 +104,20 @@ const Toolbar = ({
       <button onClick={increaseVolume} disabled={volume === 1} className="text-gray-600 p-1 hover:text-blue-500" title="Volume up">
         <TbVolume size={21} />
       </button>
+
+      {/* <div className="flex items-center">
+        <input
+          type="range"
+          min="1"
+          max="3"
+          step="0.1"
+          value={amplification}
+          onChange={handleAmplificationChange}
+          className="w-24 h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer"
+        />
+        <span className="ml-2 text-gray-600">{amplification.toFixed(1)}x</span>
+      </div> */}
+
 
       {/* Display current time*/}
       <span className="bg-white p-1 text-gray-600 rounded-sm border ">Time: {formatTime(currentTime)}</span>
