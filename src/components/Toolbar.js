@@ -19,13 +19,13 @@ const Toolbar = ({
   goToEnd,
   increaseFontSize,
   decreaseFontSize,
-  transcript,
   currentTime,
   onGetTimestamp,
   onInsertTimestamp,
   toggleFindReplace,
   handleAmplificationChange,
-  amplification
+  amplification,
+  downloadTranscript
 }) => {
   const fileInputRef = useRef(null);
 
@@ -42,18 +42,6 @@ const Toolbar = ({
     fileInputRef.current.click();
   };
 
-  const downloadTranscript = () => {
-    const element = document.createElement('a');
-    const file = new Blob([transcript], { type: 'text/plain' });
-    element.href = URL.createObjectURL(file);
-    element.download = 'transcript.txt';
-    document.body.appendChild(element); // Append to body to ensure it's clickable
-    element.click(); // Trigger the download
-    document.body.removeChild(element); // Clean up
-  };
-
-  
-
   const handleTimestamp = () => {
     const timestamp = onGetTimestamp(); // This comes from `App.js` via props
     onInsertTimestamp(timestamp); // Pass timestamp to `Textarea` handler
@@ -68,7 +56,6 @@ const Toolbar = ({
     return timeString;
   }
   
-
   return (
     <div className="flex items-center space-x-6 p-1 bg-white rounded-lg shadow-md border">
       {/* Play/pause icon */}

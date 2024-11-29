@@ -56,6 +56,11 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
     }
   };
 
+  const getText = () => {
+    if (!quillInstanceRef.current) return;
+    return quillInstanceRef.current.getText();
+  };
+
   const replaceAll = (findText, replaceText) => {
     if (!quillInstanceRef.current) return;
   
@@ -73,12 +78,14 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
     }
   };
   
+  
   // Expose the `insertTimestamp` method to the parent component
   useImperativeHandle(ref, () => ({
     insertTimestamp,
     findAndHighlight,
     replaceText,
-    replaceAll
+    replaceAll,
+    getText
   }));
 
   useEffect(() => {
@@ -100,12 +107,12 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
     const editorContainer = editorRef.current.querySelector('.ql-editor'); // Access the Quill editor content
     if (editorContainer) {
       editorContainer.style.font = `${fontSize}px "Poppins", sans-serif`; // Set font size and family
-      editorContainer.style.padding = '20px'; // Set padding to 0
-      editorContainer.style.setProperty('line-height', '35px', 'important'); // Adjust line height for better readability
+      editorContainer.style.padding = '20px'; // Set padding to 20px
+      editorContainer.style.setProperty('line-height', '30px', 'important'); // Adjust line height for better readability
       editorContainer.style.overflowY = 'auto'; // Enable vertical scrolling
       editorContainer.style.whiteSpace = 'pre-wrap'; // Preserve newlines and wrap text
       editorContainer.style.wordBreak = 'break-word'; // Break long words into the next line
-      editorContainer.style.wordSpacing = '12px'; 
+      editorContainer.style.wordSpacing = '5px'; 
     }
 
     // Load the saved transcript from localStorage if available

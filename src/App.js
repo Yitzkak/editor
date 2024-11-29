@@ -15,6 +15,7 @@ function App() {
   const [findText, setFindText] = useState("");
   const [replaceText, setReplaceText] = useState("");
   const [amplification, setAmplification] = useState(1);
+  const [currentTranscript, setCurrentTranscript] = useState("");
 
   const [currentTime, setCurrentTime] = useState(0);
   const editorRef = useRef(null);
@@ -67,6 +68,23 @@ function App() {
 
   const getTimestamp = () => audioPlayerRef.current?.getTimestamp();
   const insertTimestamp = (timestamp) => editorRef.current?.insertTimestamp(timestamp);
+  const getTranscript = () => {
+    if (!editorRef.current) return "";
+    const getTextContent = () => editorRef.current?.getText();
+    return setCurrentTranscript(getTextContent());
+  }
+
+  const downloadTranscript = () => {
+    const getTextContent = () => editorRef.current?.getText();
+    const textContent =  getTextContent();
+    const element = document.createElement('a');
+    const file = new Blob([textContent], { type: 'text/plain' });
+    element.href = URL.createObjectURL(file);
+    element.download = 'transcript.txt';
+    document.body.appendChild(element); // Append to body to ensure it's clickable
+    element.click(); // Trigger the download
+    document.body.removeChild(element); // Clean up
+  };
 
   // Function to update the current time
   useEffect(() => {
@@ -168,6 +186,7 @@ function App() {
             toggleFindReplace={toggleFindReplace}
             handleAmplificationChange={handleAmplificationChange}
             amplification={amplification}
+            downloadTranscript={downloadTranscript}
           />
         </div>
 
