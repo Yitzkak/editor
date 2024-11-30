@@ -15,9 +15,9 @@ function App() {
   const [findText, setFindText] = useState("");
   const [replaceText, setReplaceText] = useState("");
   const [amplification, setAmplification] = useState(1);
-  const [currentTranscript, setCurrentTranscript] = useState("");
-
+  const [playbackSpeed, setPlaybackSpeed] = useState(1); // Default speed is 1x (normal speed)
   const [currentTime, setCurrentTime] = useState(0);
+
   const editorRef = useRef(null);
   const audioPlayerRef = useRef(null);
 
@@ -68,12 +68,8 @@ function App() {
 
   const getTimestamp = () => audioPlayerRef.current?.getTimestamp();
   const insertTimestamp = (timestamp) => editorRef.current?.insertTimestamp(timestamp);
-  const getTranscript = () => {
-    if (!editorRef.current) return "";
-    const getTextContent = () => editorRef.current?.getText();
-    return setCurrentTranscript(getTextContent());
-  }
 
+  // Function to download the transcript
   const downloadTranscript = () => {
     const getTextContent = () => editorRef.current?.getText();
     const textContent =  getTextContent();
@@ -162,7 +158,7 @@ function App() {
       <div className="flex flex-col max-h-full items-center w-full max-w-6xl rounded-sm">
         {/* Audio player at the top */}
         <div className="w-full">
-        <AudioPlayer ref={audioPlayerRef} audioFile={audioFile} volume={volume || 1} />
+        <AudioPlayer ref={audioPlayerRef} audioFile={audioFile} volume={volume || 1} playbackSpeed={playbackSpeed}/>
         </div>
         
         {/* Toolbar at the top, passing handleFileUpload */}
@@ -187,6 +183,8 @@ function App() {
             handleAmplificationChange={handleAmplificationChange}
             amplification={amplification}
             downloadTranscript={downloadTranscript}
+            playbackSpeed={playbackSpeed}
+            setPlaybackSpeed={setPlaybackSpeed}
           />
         </div>
 

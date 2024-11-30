@@ -2,7 +2,7 @@ import React, { useEffect, useRef, forwardRef, useImperativeHandle } from 'react
 import WaveSurfer from 'wavesurfer.js';
 import "../App.css";
 
-const AudioPlayer = forwardRef(({ audioFile, volume, amplification = 1 }, ref) => {
+const AudioPlayer = forwardRef(({ audioFile, volume, amplification = 1, playbackSpeed }, ref) => {
   const waveformRef = useRef(null);
   const wavesurfer = useRef(null);
   const gainNode = useRef(null); // Gain node for volume boost
@@ -89,15 +89,12 @@ const AudioPlayer = forwardRef(({ audioFile, volume, amplification = 1 }, ref) =
     return () => wavesurfer.current?.destroy();
   }, []);
 
-   // Format time in HH:MM:SS or MM:SS format
-  function formatTime(seconds) {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = Math.floor(seconds % 60);
-    const timeString = h > 0 ? `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}` : `0:${m}:${s.toString().padStart(2, '0')}`;
-    return timeString;
-  }
-
+  useEffect(() => {
+    if (wavesurfer.current) {
+      wavesurfer.current.setPlaybackRate(playbackSpeed); // Set speed on WaveSurfer.js instance
+    }
+  }, [playbackSpeed]); // Re-run whenever playbackSpeed changes
+  
   useEffect(() => {
     if (audioFile && wavesurfer.current) {
       const fileUrl = URL.createObjectURL(audioFile);
@@ -111,6 +108,15 @@ const AudioPlayer = forwardRef(({ audioFile, volume, amplification = 1 }, ref) =
       console.log('useEffect in AudioPlayer', volume);
     }
   }, [volume]); 
+
+  // Format time in HH:MM:SS or MM:SS format
+  function formatTime(seconds) {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = Math.floor(seconds % 60);
+    const timeString = h > 0 ? `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}` : `0:${m}:${s.toString().padStart(2, '0')}`;
+    return timeString;
+  }
 
   const updateAmplification = (factor) => {
     if (gainNode.current) {

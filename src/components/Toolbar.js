@@ -1,11 +1,11 @@
 // Toolbar.js
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { FiDownload, FiMoreHorizontal, FiZoomIn, FiZoomOut } from 'react-icons/fi';
 import { TbPlayerSkipBack, TbPlayerSkipForward, TbPlayerTrackNext, TbPlayerTrackPrev, TbVolume, TbVolume2 } from "react-icons/tb";
 import { FiSave } from "react-icons/fi";
 import { PiPlayPauseBold } from "react-icons/pi";
 import { RiFindReplaceLine, RiFileUploadLine } from "react-icons/ri";
-import { MdMoreTime } from "react-icons/md";
+import { MdMoreTime, MdSpeed } from "react-icons/md";
 
 const Toolbar = ({ 
   onFileUpload,
@@ -25,9 +25,13 @@ const Toolbar = ({
   toggleFindReplace,
   handleAmplificationChange,
   amplification,
-  downloadTranscript
+  downloadTranscript,
+  playbackSpeed,
+  setPlaybackSpeed
 }) => {
   const fileInputRef = useRef(null);
+  const [showSpeedSlider, setShowSpeedSlider] = useState(false);
+  const [speed, setSpeed] = useState(playbackSpeed);
 
   // Handle file selection
   const handleFileChange = (event) => {
@@ -56,6 +60,13 @@ const Toolbar = ({
     return timeString;
   }
   
+  // Function to handle slider change
+  const handleSpeedChange = (e) => {
+    const newSpeed = parseFloat(e.target.value);
+    setSpeed(newSpeed);
+    setPlaybackSpeed(newSpeed); // Update speed in App.js
+  };
+
   return (
     <div className="flex items-center space-x-6 p-1 bg-white rounded-lg shadow-md border">
       {/* Play/pause icon */}
@@ -114,7 +125,6 @@ const Toolbar = ({
         <MdMoreTime size={21} />
       </button>
 
-
       {/* Increase font icon */}
       <button onClick={increaseFontSize} className="text-gray-600 p-1 hover:text-blue-500" title="Increase font">
         <FiZoomIn size={21} />
@@ -129,7 +139,37 @@ const Toolbar = ({
       <button className="text-gray-600 p-1  hover:text-blue-500" title="Save">
         <FiSave size={21} />
       </button>
-      
+
+      {/* Speed icon */}
+      <div className="relative">
+        <button
+          onClick={() => setShowSpeedSlider(!showSpeedSlider)}
+          className="text-gray-600 p-1 hover:text-blue-500"
+          title="Speed"
+        >
+          <MdSpeed size={21} />
+        </button>
+
+        {/* Show the speed slider if toggled */}
+        {showSpeedSlider && (
+          <div
+            className="absolute top-full left-1/2 -translate-x-1/2 mt-2  z-10 flex justify-center"
+            style={{ width: "4px" , height: "80px" }}
+          >
+            <input
+              type="range"
+              min="0.5"
+              max="2"
+              step="0.1"
+              value={speed}
+              onChange={handleSpeedChange}
+              className="w-20 h-20 transform rotate-90 cursor-pointer" // Rotate slider to vertical
+            />
+          </div>
+        )}
+      </div>
+
+
       {/* Search icon */}
       <button onClick={toggleFindReplace} className="text-gray-600 p-1 hover:text-blue-500" title="Find & Replace">
         <RiFindReplaceLine size={21} />
