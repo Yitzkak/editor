@@ -93,6 +93,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
     //quillInstanceRef.current.formatText(selectionRange.index, updatedText.length, { background: '#3399FF' });
   
     setHighlightedText(updatedText); // Update state
+    
   };
   
   const swapSpeakerLabels = (label1, label2) => {
@@ -154,16 +155,17 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
     // };
 
     // Remove highlight when clicking inside the editor
-    // const handleEditorClick = () => {
-    //   if (lastHighlightedRange) {
-    //     // Remove highlight when clicking inside the editor
-    //     quill.formatText(lastHighlightedRange.index, lastHighlightedRange.length, { background: false });
-    //     lastHighlightedRange = null; // Reset the stored range
-    //   }
-    //   //setHighlightedText(""); // Reset highlighted text when clicking inside the editor
-    // };
+    const handleEditorClick = () => {
+      if (lastHighlightedRange) {
+        // Remove highlight when clicking inside the editor
+        // quill.formatText(lastHighlightedRange.index, lastHighlightedRange.length, { background: false });
+        lastHighlightedRange = null; // Reset the stored range
+      }
+      //setHighlightedText(""); // Reset highlighted text when clicking inside the editor
+      
+    };
     // quill.on('selection-change', handleSelectionChange);
-    // quill.root.addEventListener('click', handleEditorClick);
+    quill.root.addEventListener('click', handleEditorClick);
 
 
     // Set fixed height and custom font
@@ -212,7 +214,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
     return () => {
       quill.off('text-change'); // Clean up on component unmount
       // quill.off('selection-change', handleSelectionChange);
-      // quill.root.removeEventListener('click', handleEditorClick);
+      quill.root.removeEventListener('click', handleEditorClick);
     };
   }, [fontSize]);
 

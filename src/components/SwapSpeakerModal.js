@@ -11,7 +11,7 @@ const SwapSpeakerModal = ({ onClose, handleReplaceClick, handleSwapClick, fromLa
           <label className="block text-sm font-medium">Speaker 1</label>
           <input
             type="text"
-            value={fromLabel ? fromLabel : "S1"}
+            value={fromLabel}
             onChange={(e) => setFromLabel(e.target.value)}
             className="w-full p-2 border rounded"
           />
@@ -21,7 +21,7 @@ const SwapSpeakerModal = ({ onClose, handleReplaceClick, handleSwapClick, fromLa
           <label className="block text-sm font-medium">Speaker 2</label>
           <input
             type="text"
-            value={toLabel ? toLabel : "S2"}
+            value={toLabel}
             onChange={(e) => setToLabel(e.target.value)}
             className="w-full p-2 border rounded"
           />

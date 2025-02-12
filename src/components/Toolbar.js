@@ -41,8 +41,8 @@ const Toolbar = ({
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [showSwapModal, setShowSwapModal] = useState(false);
 
-  const [fromLabel, setFromLabel] = useState('');
-  const [toLabel, setToLabel] = useState('');
+  const [fromLabel, setFromLabel] = useState('S1');
+  const [toLabel, setToLabel] = useState('S2');
 
   const handleReplaceClick = () => {
     if (fromLabel && toLabel) {
