@@ -1,11 +1,14 @@
 // Toolbar.js
 import React, { useRef, useState } from 'react';
-import { FiDownload, FiMoreHorizontal, FiZoomIn, FiZoomOut } from 'react-icons/fi';
+import SwapSpeakerModal from "./SwapSpeakerModal";
+
+//Icons import
+import { FiDownload, FiMoreHorizontal, FiZoomIn, FiZoomOut, FiSave } from 'react-icons/fi';
 import { TbPlayerSkipBack, TbPlayerSkipForward, TbPlayerTrackNext, TbPlayerTrackPrev, TbVolume, TbVolume2 } from "react-icons/tb";
-import { FiSave } from "react-icons/fi";
 import { PiPlayPauseBold } from "react-icons/pi";
 import { RiFindReplaceLine, RiFileUploadLine } from "react-icons/ri";
 import { MdMoreTime, MdSpeed } from "react-icons/md";
+import { FaExchangeAlt } from "react-icons/fa";
 
 const Toolbar = ({ 
   onFileUpload,
@@ -27,11 +30,31 @@ const Toolbar = ({
   amplification,
   downloadTranscript,
   playbackSpeed,
-  setPlaybackSpeed
+  setPlaybackSpeed,
+  onReplaceSpeakerLabel, 
+  onSwapSpeakerLabels,
+  handlePreventBlur
 }) => {
   const fileInputRef = useRef(null);
   const [showSpeedSlider, setShowSpeedSlider] = useState(false);
   const [speed, setSpeed] = useState(playbackSpeed);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [showSwapModal, setShowSwapModal] = useState(false);
+
+  const [fromLabel, setFromLabel] = useState('');
+  const [toLabel, setToLabel] = useState('');
+
+  const handleReplaceClick = () => {
+    if (fromLabel && toLabel) {
+      onReplaceSpeakerLabel(fromLabel, toLabel);
+    }
+  };
+
+  const handleSwapClick = () => {
+    if (fromLabel && toLabel) {
+      onSwapSpeakerLabels(fromLabel, toLabel);
+    }
+  };
 
   // Handle file selection
   const handleFileChange = (event) => {
@@ -169,7 +192,6 @@ const Toolbar = ({
         )}
       </div>
 
-
       {/* Search icon */}
       <button onClick={toggleFindReplace} className="text-gray-600 p-1 hover:text-blue-500" title="Find & Replace">
         <RiFindReplaceLine size={21} />
@@ -194,10 +216,44 @@ const Toolbar = ({
         style={{ display: 'none' }}
       />
       
-      {/* More options icon */}
-      <button className="text-gray-600 p-1 hover:text-blue-500" title="More Options">
-        <FiMoreHorizontal size={21} />
-      </button>
+      {/* Three-dot menu */}
+      <div className="relative">
+        {/* More options icon */}
+          <button onClick={() => setDropdownOpen(!dropdownOpen)} className="text-gray-600 p-1 hover:text-blue-500" title="More Options">
+            <FiMoreHorizontal size={21} />
+          </button>
+
+        {/* Dropdown menu */}
+        {dropdownOpen && (
+          <div className="absolute right-0 mt-2 w-56 bg-white border rounded-lg shadow-lg z-50">
+            {/* Swap Speaker Labels Option */}
+            <button
+              onClick={() => {
+                setShowSwapModal(true);
+                setDropdownOpen(false);
+              }}
+              className="flex items-center w-full px-6 py-4 text-[12px] hover:bg-gray-100"
+            >
+              <FaExchangeAlt size={15} className="mr-6 text-gray-600 text-[12px] font-[400]" />
+              <span>Swap Speaker Labels</span>
+            </button>
+          </div>
+        )}
+
+        {/* Swap Speaker Modal */}
+        {showSwapModal && (
+          <SwapSpeakerModal 
+            onClose={() => setShowSwapModal(false)} 
+            fromLabel={fromLabel} 
+            toLabel={toLabel}
+            handleSwapClick={handleSwapClick}
+            handleReplaceClick={handleReplaceClick}
+            setFromLabel={setFromLabel}
+            setToLabel={setToLabel}
+          />
+            
+        )}
+      </div>
     </div>
   );
 };

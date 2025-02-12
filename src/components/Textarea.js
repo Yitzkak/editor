@@ -1,10 +1,12 @@
-import React, { useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
+import React, { useEffect, useState,useRef, useImperativeHandle, forwardRef } from 'react';
 import Quill from 'quill';
 import 'quill/dist/quill.snow.css';
 
 const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) => {
   const editorRef = useRef(null);
   const quillInstanceRef = useRef(null); // Store Quill instance here
+  const [highlightedText, setHighlightedText] = useState('');
+  const [selectionRange, setSelectionRange] = useState(null);
 
   const insertTimestamp = (timestamp) => {
     if (!quillInstanceRef.current) return;
@@ -77,15 +79,48 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
       regex.lastIndex += replaceText.length - findText.length;
     }
   };
+
+  const replaceSpeakerLabel = (fromLabel, toLabel) => {
+    if (!quillInstanceRef.current || !highlightedText.includes(fromLabel)) return;
   
+    const updatedText = highlightedText.replace(new RegExp(`\\b${fromLabel}\\b`, 'g'), toLabel);
   
+    // Replace only within the selected range
+    quillInstanceRef.current.deleteText(selectionRange.index, selectionRange.length);
+    quillInstanceRef.current.insertText(selectionRange.index, updatedText);
+
+    // Apply the blue highlight after swapping
+    //quillInstanceRef.current.formatText(selectionRange.index, updatedText.length, { background: '#3399FF' });
+  
+    setHighlightedText(updatedText); // Update state
+  };
+  
+  const swapSpeakerLabels = (label1, label2) => {
+    if (!quillInstanceRef.current || (!highlightedText.includes(label1) && !highlightedText.includes(label2))) return;
+  
+    const updatedText = highlightedText.replace(new RegExp(`\\b(${label1}|${label2})\\b`, 'g'), (match) =>
+      match === label1 ? label2 : label1
+    );
+  
+    // Replace only within the selected range
+    quillInstanceRef.current.deleteText(selectionRange.index, selectionRange.length);
+    quillInstanceRef.current.insertText(selectionRange.index, updatedText);
+
+    //Re-apply highlight after swapping labels
+    //quillInstanceRef.current.formatText(selectionRange.index, updatedText.length, { background: '#3399FF' });
+  
+    setHighlightedText(updatedText); // Update state
+  };
+
   // Expose the `insertTimestamp` method to the parent component
   useImperativeHandle(ref, () => ({
     insertTimestamp,
     findAndHighlight,
     replaceText,
     replaceAll,
-    getText
+    getText,
+    replaceSpeakerLabel,
+    swapSpeakerLabels, 
   }));
 
   useEffect(() => {
@@ -102,6 +137,34 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
     quillInstanceRef.current = quill;
 
     quill.focus(); // Ensure the editor is focused for typing
+
+    let lastHighlightedRange = null; // Store last highlighted range
+
+    //Add a blue highlight when the editor loses focus
+    // And loses the blue highlight color. 
+    // const handleSelectionChange = (range, oldRange, source) => {
+    //   if (!range && oldRange) {
+         // Quill is about to lose focus
+    //     const text = quill.getText(oldRange.index, oldRange.length);
+    //     if (text.trim() !== "") {
+    //       lastHighlightedRange = oldRange; // Store highlighted range
+    //       quill.formatText(oldRange.index, oldRange.length, { background: '#FFEB3B' });
+    //     }
+    //   }
+    // };
+
+    // Remove highlight when clicking inside the editor
+    // const handleEditorClick = () => {
+    //   if (lastHighlightedRange) {
+    //     // Remove highlight when clicking inside the editor
+    //     quill.formatText(lastHighlightedRange.index, lastHighlightedRange.length, { background: false });
+    //     lastHighlightedRange = null; // Reset the stored range
+    //   }
+    //   //setHighlightedText(""); // Reset highlighted text when clicking inside the editor
+    // };
+    // quill.on('selection-change', handleSelectionChange);
+    // quill.root.addEventListener('click', handleEditorClick);
+
 
     // Set fixed height and custom font
     const editorContainer = editorRef.current.querySelector('.ql-editor'); // Access the Quill editor content
@@ -137,8 +200,19 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
       localStorage.setItem('transcript', updatedContent); // Save the content to localStorage
     });
 
+    // Handle text selection
+    quill.on('selection-change', (range) => {
+      if (range && range.length > 0) {
+        const selectedText = quill.getText(range.index, range.length);
+        setHighlightedText(selectedText);
+        setSelectionRange(range); 
+      }
+    });
+
     return () => {
       quill.off('text-change'); // Clean up on component unmount
+      // quill.off('selection-change', handleSelectionChange);
+      // quill.root.removeEventListener('click', handleEditorClick);
     };
   }, [fontSize]);
 

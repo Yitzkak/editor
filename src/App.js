@@ -153,6 +153,18 @@ function App() {
     };
   }, [togglePlayPause, getTimestamp, insertTimestamp, skipBack, skipForward]);
 
+  const handleReplaceSpeakerLabel = (fromLabel, toLabel) => {
+    if (editorRef.current) {
+      editorRef.current.replaceSpeakerLabel(fromLabel, toLabel);
+    }
+  };
+
+  const handleSwapSpeakerLabels = (label1, label2) => {
+    if (editorRef.current) {
+      editorRef.current.swapSpeakerLabels(label1, label2);
+    }
+  };
+
   return (
     <div className="flex justify-center min-w-96  bg-gray-100 p-[5px] h-screen" >
       <div className="flex flex-col max-h-full items-center w-full max-w-6xl rounded-sm">
@@ -185,6 +197,8 @@ function App() {
             downloadTranscript={downloadTranscript}
             playbackSpeed={playbackSpeed}
             setPlaybackSpeed={setPlaybackSpeed}
+            onReplaceSpeakerLabel={handleReplaceSpeakerLabel} 
+            onSwapSpeakerLabels={handleSwapSpeakerLabels} 
           />
         </div>
 
