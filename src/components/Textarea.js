@@ -2,11 +2,82 @@ import React, { useEffect, useState,useRef, useImperativeHandle, forwardRef } fr
 import Quill from 'quill';
 import 'quill/dist/quill.snow.css';
 
+const predefinedWords = ['[overlapping conversation]', '[laughter]', '[pause]', '[chuckle]', '[automated voice]', '[background conversation]'];
+
 const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) => {
   const editorRef = useRef(null);
   const quillInstanceRef = useRef(null); // Store Quill instance here
   const [highlightedText, setHighlightedText] = useState('');
   const [selectionRange, setSelectionRange] = useState(null);
+  const [suggestionPosition, setSuggestionPosition] = useState({ top: 0, left: 0 });
+
+  const [suggestions, setSuggestions] = useState([]);
+  const [currentInput, setCurrentInput] = useState('');
+
+  const getWordsFromTranscript = () => {
+    if (!quillInstanceRef.current) return [];
+    const content = quillInstanceRef.current.getText();
+    const words = new Set(content.match(/\b\w+\b/g));
+    return [...words, ...predefinedWords];
+  };
+
+  const handleTextChange = () => {
+    if (!quillInstanceRef.current) return;
+    
+    const quill = quillInstanceRef.current;
+    const range = quill.getSelection();
+    if (!range) return;
+    
+    const textBeforeCursor = quill.getText(0, range.index).trim().split(/\s+/).pop();
+    setCurrentInput(textBeforeCursor);
+    
+    const possibleSuggestions = getWordsFromTranscript().filter(word =>
+      word.toLowerCase().startsWith(textBeforeCursor.toLowerCase())
+    );
+  
+    setSuggestions(possibleSuggestions);
+
+    if (possibleSuggestions.length > 0) {
+      const cursorBounds = quill.getBounds(range.index);
+      setSuggestionPosition({ top: cursorBounds.top + 30, left: cursorBounds.left });
+    }
+  };
+
+  const handleSuggestionSelect = (word) => {
+    if (!quillInstanceRef.current) return;
+  
+    const quill = quillInstanceRef.current;
+    
+    // Ensure editor is focused
+    quill.focus();
+  
+    // Get the current selection range again after focusing
+    const range = quill.getSelection();
+    if (!range) return; // Still null? Exit function.
+  
+    // Get the current text before the cursor position
+    const textBeforeCursor = quill.getText(0, range.index);
+    
+    // Extract the last typed word
+    const words = textBeforeCursor.trim().split(/\s+/);
+    const lastWord = words[words.length - 1]; 
+  
+    // Find the start index of the last word
+    const startIndex = range.index - lastWord.length;
+  
+    // Replace the last typed word with the selected suggestion
+    quill.deleteText(startIndex, lastWord.length);
+    quill.insertText(startIndex, word + " ");
+    
+    // Move cursor to the end of inserted word
+    quill.setSelection(startIndex + word.length + 1);
+  
+    // Clear suggestions
+    setSuggestions([]);
+    setCurrentInput('');
+  };
+  
+  
 
   const insertTimestamp = (timestamp) => {
     if (!quillInstanceRef.current) return;
@@ -23,6 +94,13 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
 
       // Ensure the editor remains focused
       //quillInstanceRef.current.focus();
+    }
+  };
+
+  const handleKeyDown = (event) => {
+    if (event.key === "Tab" && suggestions.length > 0) {
+      event.preventDefault(); // Prevent default tab behavior
+      handleSuggestionSelect(suggestions[0]); // Select the first suggestion
     }
   };
 
@@ -136,23 +214,8 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
 
     // Assign the Quill instance to the ref
     quillInstanceRef.current = quill;
-
     quill.focus(); // Ensure the editor is focused for typing
-
     let lastHighlightedRange = null; // Store last highlighted range
-
-    //Add a blue highlight when the editor loses focus
-    // And loses the blue highlight color. 
-    // const handleSelectionChange = (range, oldRange, source) => {
-    //   if (!range && oldRange) {
-         // Quill is about to lose focus
-    //     const text = quill.getText(oldRange.index, oldRange.length);
-    //     if (text.trim() !== "") {
-    //       lastHighlightedRange = oldRange; // Store highlighted range
-    //       quill.formatText(oldRange.index, oldRange.length, { background: '#FFEB3B' });
-    //     }
-    //   }
-    // };
 
     // Remove highlight when clicking inside the editor
     const handleEditorClick = () => {
@@ -167,6 +230,26 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
     // quill.on('selection-change', handleSelectionChange);
     quill.root.addEventListener('click', handleEditorClick);
 
+    quill.on('text-change', () => {
+      handleTextChange();
+      const range = quill.getSelection();
+      if (range) {
+        const textBeforeCursor = quill.getText(Math.max(0, range.index - 3), 3).trim();
+        setCurrentInput(textBeforeCursor);
+        
+        const possibleSuggestions = getWordsFromTranscript().filter(word =>
+          word.toLowerCase().startsWith(textBeforeCursor.toLowerCase())
+        );
+        setSuggestions(possibleSuggestions);
+    
+        if (possibleSuggestions.length > 0) {
+          const cursorBounds = quill.getBounds(range.index); // Get cursor position
+          setSuggestionPosition({ top: cursorBounds.top + 30, left: cursorBounds.left }); // Adjust dropdown position
+        }
+      }
+    });
+
+    document.addEventListener('keydown', handleKeyDown);
 
     // Set fixed height and custom font
     const editorContainer = editorRef.current.querySelector('.ql-editor'); // Access the Quill editor content
@@ -211,20 +294,45 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
       }
     });
 
+  
+
     return () => {
       quill.off('text-change'); // Clean up on component unmount
-      // quill.off('selection-change', handleSelectionChange);
       quill.root.removeEventListener('click', handleEditorClick);
+      document.removeEventListener('keydown', handleKeyDown);
     };
   }, [fontSize]);
 
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (editorRef.current && !editorRef.current.contains(event.target)) {
+        setSuggestions([]);
+      }
+    };
+  
+    document.addEventListener("click", handleClickOutside);
+    return () => document.removeEventListener("click", handleClickOutside);
+  }, []);
+
   return (
-    <div className="w-full h-[460px] shadow-lg border">
+    <div className="w-full h-[460px] shadow-lg border relative">
       {/* Quill editor container */}
       <div
         ref={editorRef}
         className="font-poppins bg-white rounded-md h-full break-words word-space-2 whitespace-pre-wrap"
       ></div>
+      {suggestions.length > 0 && (
+        <div
+          className="absolute bg-white border shadow-lg rounded p-2 text-sm"
+          style={{ top: suggestionPosition.top, left: suggestionPosition.left, position: 'absolute' }}
+        >
+          {suggestions.map((word, index) => (
+            <div key={index} 
+            onClick={() => handleSuggestionSelect(word)} 
+            className="hover:bg-gray-200 p-1 cursor-pointer">{word}</div>
+          ))}
+        </div>
+      )}
     </div>
   );
 });
