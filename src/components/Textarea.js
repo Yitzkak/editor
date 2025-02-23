@@ -18,7 +18,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
     if (!quillInstanceRef.current) return [];
     const content = quillInstanceRef.current.getText();
     const words = new Set(content.match(/\b\w+\b/g));
-    return [...words, ...predefinedWords];
+    return [ ...predefinedWords];
   };
 
   const handleTextChange = () => {
@@ -76,8 +76,6 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
     setSuggestions([]);
     setCurrentInput('');
   };
-  
-  
 
   const insertTimestamp = (timestamp) => {
     if (!quillInstanceRef.current) return;
@@ -98,7 +96,10 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
   };
 
   const handleKeyDown = (event) => {
-    if (event.key === "Tab" && suggestions.length > 0) {
+    if (event.key === "Tab"  && suggestions.length > 0) {
+      console.log("Suggestions: " + suggestions.length);
+      // console.log("Current input: " + suggestions);
+      console.log("Tab key pressed");
       event.preventDefault(); // Prevent default tab behavior
       handleSuggestionSelect(suggestions[0]); // Select the first suggestion
     }
@@ -248,7 +249,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
         }
       }
     });
-
+    
     document.addEventListener('keydown', handleKeyDown);
 
     // Set fixed height and custom font
@@ -294,8 +295,6 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
       }
     });
 
-  
-
     return () => {
       quill.off('text-change'); // Clean up on component unmount
       quill.root.removeEventListener('click', handleEditorClick);
@@ -311,7 +310,9 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
     };
   
     document.addEventListener("click", handleClickOutside);
-    return () => document.removeEventListener("click", handleClickOutside);
+    return () => {
+      document.removeEventListener("click", handleClickOutside);
+    } 
   }, []);
 
   return (
