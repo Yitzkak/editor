@@ -2,7 +2,7 @@ import React, { useEffect, useRef, forwardRef, useImperativeHandle } from 'react
 import WaveSurfer from 'wavesurfer.js';
 import "../App.css";
 
-const AudioPlayer = forwardRef(({ audioFile, volume, amplification = 1, playbackSpeed }, ref) => {
+const AudioPlayer = forwardRef(({ audioFile, volume, amplification = 1, speed }, ref) => {
   const waveformRef = useRef(null);
   const wavesurfer = useRef(null);
   const gainNode = useRef(null); // Gain node for volume boost
@@ -18,11 +18,20 @@ const AudioPlayer = forwardRef(({ audioFile, volume, amplification = 1, playback
         barGap: 1,
         barRadius: 2,
         barHeight: 5,
-        backend: 'WebAudio',
+        backend: 'MediaElement',
       });
 
       wavesurfer.current.on("ready", () => {
         const backend = wavesurfer.current.backend;
+        if (backend && typeof backend.getMediaElement === "function") {
+          const audio = backend.getMediaElement();
+          if (audio) {
+            audio.preservesPitch = true; // Preserve pitch when changing speed
+          }
+        } else {
+          console.error("WaveSurfer backend is not ready yet.");
+        }
+        
         if (backend && backend.ac) {
           const audioContext = backend.ac;
           gainNode.current = audioContext.createGain();
@@ -91,9 +100,9 @@ const AudioPlayer = forwardRef(({ audioFile, volume, amplification = 1, playback
 
   useEffect(() => {
     if (wavesurfer.current) {
-      wavesurfer.current.setPlaybackRate(playbackSpeed); // Set speed on WaveSurfer.js instance
+      wavesurfer.current.setPlaybackRate(speed); // Set speed on WaveSurfer.js instance
     }
-  }, [playbackSpeed]); // Re-run whenever playbackSpeed changes
+  }, [speed]); // Re-run whenever playbackSpeed changes
   
   useEffect(() => {
     if (audioFile && wavesurfer.current) {
@@ -120,7 +129,7 @@ const AudioPlayer = forwardRef(({ audioFile, volume, amplification = 1, playback
 
   const updateAmplification = (factor) => {
     if (gainNode.current) {
-      gainNode.current.gain.value = factor;
+      gainNode.current.gain.value = Math.max(factor, 1);
     }
   };
 
@@ -189,6 +198,7 @@ const AudioPlayer = forwardRef(({ audioFile, volume, amplification = 1, playback
     getCurrentTime: () => wavesurfer.current?.getCurrentTime() || 0,
     getDuration: () => wavesurfer.current?.getDuration() || 0,
     pauseAudio: () => wavesurfer.current?.pause(),
+    playAudio: () => wavesurfer.current?.play(),
     getTimestamp: () => {
       if (wavesurfer.current) {
         const currentTime = wavesurfer.current.getCurrentTime();

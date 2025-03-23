@@ -15,7 +15,7 @@ function App() {
   const [findText, setFindText] = useState("");
   const [replaceText, setReplaceText] = useState("");
   const [amplification, setAmplification] = useState(1);
-  const [playbackSpeed, setPlaybackSpeed] = useState(1); // Default speed is 1x (normal speed)
+  const [playbackSpeed, setPlaybackSpeed] = useState(1.0); // Default 100%
   const [currentTime, setCurrentTime] = useState(0);
 
   const editorRef = useRef(null);
@@ -34,10 +34,20 @@ function App() {
 
   // Function to handle play/pause
   const togglePlayPause = () => audioPlayerRef.current?.togglePlayPause();
-  const skipBack = () => audioPlayerRef.current?.skipBack(5); // Skip back 5 seconds
-  const skipForward = () => audioPlayerRef.current?.skipForward(5); // Skip forward 5 seconds
+  const skipBack = () => {
+    audioPlayerRef.current?.skipBack(5); // Skip back 5 seconds
+    audioPlayerRef.current?.playAudio();
+    return true;
+  } 
+  // Function to handle skip forward
+  const skipForward = () => {
+    audioPlayerRef.current?.skipForward(5); // Skip forward 5 seconds
+    audioPlayerRef.current?.playAudio();
+    return true;
+  }
+  
   const goToStart = () => audioPlayerRef.current?.seekTo(0);
-  const goToEnd = () => audioPlayerRef.current?.goToEnd();
+  const goToEnd = () => audioPlayerRef.current?.goToEnd(); 
 
   // Volume controls
   const increaseVolume = () => {
@@ -136,11 +146,13 @@ function App() {
       if (e.shiftKey && e.code === "ArrowLeft") {
         e.preventDefault(); // Prevent default behavior
         skipBack(); // Skip Backwards
+        togglePlayPause();
       }
   
       if (e.shiftKey && e.code === "ArrowRight") {
         e.preventDefault(); // Prevent default behavior
         skipForward(); // Skip Forwards
+        togglePlayPause();  
       }
     };
   
@@ -170,7 +182,12 @@ function App() {
       <div className="flex flex-col max-h-full items-center w-full max-w-6xl rounded-sm">
         {/* Audio player at the top */}
         <div className="w-full">
-        <AudioPlayer ref={audioPlayerRef} audioFile={audioFile} volume={volume || 1} playbackSpeed={playbackSpeed}/>
+        <AudioPlayer 
+          ref={audioPlayerRef} 
+          audioFile={audioFile} 
+          volume={volume || 1} 
+          speed={playbackSpeed}
+        />
         </div>
         
         {/* Toolbar at the top, passing handleFileUpload */}
@@ -195,8 +212,8 @@ function App() {
             handleAmplificationChange={handleAmplificationChange}
             amplification={amplification}
             downloadTranscript={downloadTranscript}
-            playbackSpeed={playbackSpeed}
-            setPlaybackSpeed={setPlaybackSpeed}
+            speed={playbackSpeed * 100} 
+            onSpeedChange={setPlaybackSpeed}
             onReplaceSpeakerLabel={handleReplaceSpeakerLabel} 
             onSwapSpeakerLabels={handleSwapSpeakerLabels} 
           />
@@ -204,20 +221,25 @@ function App() {
 
         {/* Textarea underneath the toolbar */}
         <div className="w-full bg-white mt-4">
-          <Textarea ref={editorRef} fontSize={fontSize} transcript={transcript} onTranscriptChange={handleTranscriptChange} />
+          <Textarea 
+            ref={editorRef} 
+            fontSize={fontSize} 
+            transcript={transcript} 
+            onTranscriptChange={handleTranscriptChange} 
+          />
         </div>
 
         <FindReplaceModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        findText={findText}
-        replaceText={replaceText}
-        setFindText={setFindText}
-        setReplaceText={setReplaceText}
-        handleReplace={handleReplace}
-        handleFind={handleFind}
-        handleReplaceAll={handleReplaceAll}
-      />
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          findText={findText}
+          replaceText={replaceText}
+          setFindText={setFindText}
+          setReplaceText={setReplaceText}
+          handleReplace={handleReplace}
+          handleFind={handleFind}
+          handleReplaceAll={handleReplaceAll}
+        />
       </div>
     </div>
   );

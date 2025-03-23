@@ -2,7 +2,7 @@ import React, { useEffect, useState,useRef, useImperativeHandle, forwardRef } fr
 import Quill from 'quill';
 import 'quill/dist/quill.snow.css';
 
-const predefinedWords = ['[overlapping conversation]', '[laughter]', '[pause]', '[chuckle]', '[automated voice]', '[background conversation]'];
+const predefinedWords = ['Objection, form.', 'Object to form', '[overlapping conversation]', '[laughter]', '[pause]', '[chuckle]', '[automated voice]', '[background conversation]'];
 
 const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) => {
   const editorRef = useRef(null);
@@ -13,6 +13,8 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
 
   const [suggestions, setSuggestions] = useState([]);
   const [currentInput, setCurrentInput] = useState('');
+
+  const suggestionsRef = useRef(suggestions);
 
   const getWordsFromTranscript = () => {
     if (!quillInstanceRef.current) return [];
@@ -31,19 +33,22 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
     const textBeforeCursor = quill.getText(0, range.index).trim().split(/\s+/).pop();
     setCurrentInput(textBeforeCursor);
     
-    const possibleSuggestions = getWordsFromTranscript().filter(word =>
-      word.toLowerCase().startsWith(textBeforeCursor.toLowerCase())
-    );
+    if (textBeforeCursor.length >= 3) {
+      const possibleSuggestions = getWordsFromTranscript().filter(word =>
+        word.toLowerCase().startsWith(textBeforeCursor.toLowerCase())
+      );
+      setSuggestions(possibleSuggestions);
   
-    setSuggestions(possibleSuggestions);
-
-    if (possibleSuggestions.length > 0) {
-      const cursorBounds = quill.getBounds(range.index);
-      setSuggestionPosition({ top: cursorBounds.top + 30, left: cursorBounds.left });
+      if (possibleSuggestions.length > 0) {
+        const cursorBounds = quill.getBounds(range.index);
+        setSuggestionPosition({ top: cursorBounds.top + 30, left: cursorBounds.left });
+      }
+    } else {
+      setSuggestions([]); // Clear suggestions if less than 3 characters are typed
     }
   };
 
-  const handleSuggestionSelect = (word) => {
+  const handleSuggestionSelect = (word, offset, event ) => {
     if (!quillInstanceRef.current) return;
   
     const quill = quillInstanceRef.current;
@@ -66,15 +71,16 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
     const startIndex = range.index - lastWord.length;
   
     // Replace the last typed word with the selected suggestion
-    quill.deleteText(startIndex, lastWord.length);
-    quill.insertText(startIndex, word + " ");
+    quill.deleteText(startIndex - offset, lastWord.length);
+    quill.insertText(startIndex - offset, word + " ");
     
     // Move cursor to the end of inserted word
-    quill.setSelection(startIndex + word.length + 1);
+    quill.setSelection((startIndex - offset) + word.length + 1 );
   
     // Clear suggestions
     setSuggestions([]);
     setCurrentInput('');
+    return false;
   };
 
   const insertTimestamp = (timestamp) => {
@@ -92,16 +98,6 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
 
       // Ensure the editor remains focused
       //quillInstanceRef.current.focus();
-    }
-  };
-
-  const handleKeyDown = (event) => {
-    if (event.key === "Tab"  && suggestions.length > 0) {
-      console.log("Suggestions: " + suggestions.length);
-      // console.log("Current input: " + suggestions);
-      console.log("Tab key pressed");
-      event.preventDefault(); // Prevent default tab behavior
-      handleSuggestionSelect(suggestions[0]); // Select the first suggestion
     }
   };
 
@@ -204,14 +200,36 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
   }));
 
   useEffect(() => {
+    suggestionsRef.current = suggestions;
+  }, [suggestions]);
+
+  useEffect(() => {
+    if (!editorRef.current) return; // Exit if editorRef is not ready
+
     // Initialize Quill
     const quill = new Quill(editorRef.current, {
       theme: 'bubble',
       modules: {
         toolbar: false, // Disable the toolbar
       },
+      keyboard: {},
       placeholder: 'Start typing your transcription here...',
     });
+
+    console.log("Quill instance:", quill);
+    console.log("Quill keyboard module:", quill.keyboard);
+
+    quill.keyboard.addBinding(
+      { key: 13 }, // Enter key
+      function () {
+        console.log('key binding done');
+        if (suggestionsRef.current?.length > 0) {
+          handleSuggestionSelect(suggestionsRef.current[0], 1);
+          return false; // Prevents default Enter behavior
+        }
+        return true; // Allows Enter if no suggestions
+      }
+    );
 
     // Assign the Quill instance to the ref
     quillInstanceRef.current = quill;
@@ -220,16 +238,31 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
 
     // Remove highlight when clicking inside the editor
     const handleEditorClick = () => {
+      console.log('Clicked inside the editor');
       if (lastHighlightedRange) {
         // Remove highlight when clicking inside the editor
         // quill.formatText(lastHighlightedRange.index, lastHighlightedRange.length, { background: false });
         lastHighlightedRange = null; // Reset the stored range
       }
       //setHighlightedText(""); // Reset highlighted text when clicking inside the editor
-      
     };
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Enter') {
+        if (suggestionsRef.current.length > 0) {
+          event.preventDefault(); // Prevent default Enter behavior
+          event.stopPropagation(); // Stop event propagation
+      
+          const firstSuggestion = suggestionsRef.current[0]; // Get first suggestion
+          handleSuggestionSelect(firstSuggestion, 1);
+          // return false;
+        }
+      }
+    };
+
     // quill.on('selection-change', handleSelectionChange);
     quill.root.addEventListener('click', handleEditorClick);
+    quill.root.addEventListener('keydown', handleKeyDown);
 
     quill.on('text-change', () => {
       handleTextChange();
@@ -238,19 +271,21 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
         const textBeforeCursor = quill.getText(Math.max(0, range.index - 3), 3).trim();
         setCurrentInput(textBeforeCursor);
         
-        const possibleSuggestions = getWordsFromTranscript().filter(word =>
-          word.toLowerCase().startsWith(textBeforeCursor.toLowerCase())
-        );
-        setSuggestions(possibleSuggestions);
-    
-        if (possibleSuggestions.length > 0) {
-          const cursorBounds = quill.getBounds(range.index); // Get cursor position
-          setSuggestionPosition({ top: cursorBounds.top + 30, left: cursorBounds.left }); // Adjust dropdown position
+        if (textBeforeCursor.length >= 3) {
+          const possibleSuggestions = getWordsFromTranscript().filter(word =>
+            word.toLowerCase().startsWith(textBeforeCursor.toLowerCase())
+          );
+          setSuggestions(possibleSuggestions);
+      
+          if (possibleSuggestions.length > 0) {
+            const cursorBounds = quill.getBounds(range.index);
+            setSuggestionPosition({ top: cursorBounds.top + 30, left: cursorBounds.left });
+          }
+        } else {
+          setSuggestions([]); // Clear suggestions
         }
       }
     });
-    
-    document.addEventListener('keydown', handleKeyDown);
 
     // Set fixed height and custom font
     const editorContainer = editorRef.current.querySelector('.ql-editor'); // Access the Quill editor content
@@ -298,7 +333,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
     return () => {
       quill.off('text-change'); // Clean up on component unmount
       quill.root.removeEventListener('click', handleEditorClick);
-      document.removeEventListener('keydown', handleKeyDown);
+      quill.root.removeEventListener('keydown', handleKeyDown);
     };
   }, [fontSize]);
 
@@ -329,7 +364,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
         >
           {suggestions.map((word, index) => (
             <div key={index} 
-            onClick={() => handleSuggestionSelect(word)} 
+            onClick={() => handleSuggestionSelect(word, 0)} 
             className="hover:bg-gray-200 p-1 cursor-pointer">{word}</div>
           ))}
         </div>

@@ -1,6 +1,7 @@
 // Toolbar.js
 import React, { useRef, useState } from 'react';
 import SwapSpeakerModal from "./SwapSpeakerModal";
+import AmplifyVolumeModal from './AmplifyVolumeModal';
 
 //Icons import
 import { FiDownload, FiMoreHorizontal, FiZoomIn, FiZoomOut, FiSave } from 'react-icons/fi';
@@ -9,6 +10,7 @@ import { PiPlayPauseBold } from "react-icons/pi";
 import { RiFindReplaceLine, RiFileUploadLine } from "react-icons/ri";
 import { MdMoreTime, MdSpeed } from "react-icons/md";
 import { FaExchangeAlt } from "react-icons/fa";
+
 
 const Toolbar = ({ 
   onFileUpload,
@@ -29,17 +31,18 @@ const Toolbar = ({
   handleAmplificationChange,
   amplification,
   downloadTranscript,
-  playbackSpeed,
-  setPlaybackSpeed,
+  speed, 
+  onSpeedChange,
   onReplaceSpeakerLabel, 
   onSwapSpeakerLabels,
   handlePreventBlur
 }) => {
   const fileInputRef = useRef(null);
   const [showSpeedSlider, setShowSpeedSlider] = useState(false);
-  const [speed, setSpeed] = useState(playbackSpeed);
+  const [speedInput, setSpeedInput] = useState(`${speed}%`);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [showSwapModal, setShowSwapModal] = useState(false);
+  const [showAmpVolumeModal, setShowAmpVolumeModal] = useState(false);
 
   const [fromLabel, setFromLabel] = useState('S1');
   const [toLabel, setToLabel] = useState('S2');
@@ -83,11 +86,20 @@ const Toolbar = ({
     return timeString;
   }
   
-  // Function to handle slider change
-  const handleSpeedChange = (e) => {
-    const newSpeed = parseFloat(e.target.value);
-    setSpeed(newSpeed);
-    setPlaybackSpeed(newSpeed); // Update speed in App.js
+   // Handle input change
+   const handleInputChange = (e) => {
+    let value = e.target.value.replace("%", ""); // Remove '%' if typed
+    setSpeedInput(value + "%"); // Always show '%' while typing
+  };
+
+  // Handle speed update when Enter is pressed or focus is lost
+  const handleSpeedUpdate = () => {
+    let numValue = parseInt(speedInput.replace("%", ""), 10); // Get numeric value
+    if (isNaN(numValue)) numValue = 100; // Default to 100% if invalid
+
+    numValue = Math.max(50, Math.min(numValue, 200)); // Clamp between 50% and 200%
+    setSpeedInput(`${numValue}%`); // Update display
+    onSpeedChange(numValue / 100); // Convert to decimal (0.5 - 2.0)
   };
 
   return (
@@ -126,7 +138,7 @@ const Toolbar = ({
         <TbVolume size={21} />
       </button>
 
-      {/* <div className="flex items-center">
+       {/* <div className="flex items-center">
         <input
           type="range"
           min="1"
@@ -136,7 +148,7 @@ const Toolbar = ({
           onChange={handleAmplificationChange}
           className="w-24 h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer"
         />
-        <span className="ml-2 text-gray-600">{amplification.toFixed(1)}x</span>
+        <span className="ml-2 text-gray-600">{amplification.toFixed(2)}x</span>
       </div> */}
 
 
@@ -164,33 +176,18 @@ const Toolbar = ({
       </button>
 
       {/* Speed icon */}
-      <div className="relative">
-        <button
-          onClick={() => setShowSpeedSlider(!showSpeedSlider)}
-          className="text-gray-600 p-1 hover:text-blue-500"
-          title="Speed"
-        >
-          <MdSpeed size={21} />
-        </button>
-
-        {/* Show the speed slider if toggled */}
-        {showSpeedSlider && (
-          <div
-            className="absolute top-full left-1/2 -translate-x-1/2 mt-2  z-10 flex justify-center"
-            style={{ width: "4px" , height: "80px" }}
-          >
-            <input
-              type="range"
-              min="0.5"
-              max="2"
-              step="0.1"
-              value={speed}
-              onChange={handleSpeedChange}
-              className="w-20 h-20 transform rotate-90 cursor-pointer" // Rotate slider to vertical
-            />
-          </div>
-        )}
+      <div>
+        <label className=" text-gray-600 text-[14px]"> Speed:</label>
+        <input
+          type="text"
+          value={speedInput}
+          onChange={handleInputChange}
+          onBlur={handleSpeedUpdate} // Apply speed when focus is lost
+          onKeyDown={(e) => e.key === "Enter" && handleSpeedUpdate()} // Apply speed when Enter is pressed
+          className="w-12 text-gray-600 text-[12px] ml-2 px-2 py-1 rounded-sm border "
+        />
       </div>
+      
 
       {/* Search icon */}
       <button onClick={toggleFindReplace} className="text-gray-600 p-1 hover:text-blue-500" title="Find & Replace">
@@ -225,7 +222,7 @@ const Toolbar = ({
 
         {/* Dropdown menu */}
         {dropdownOpen && (
-          <div className="absolute right-0 mt-2 w-56 bg-white border rounded-lg shadow-lg z-50">
+          <div className="absolute right-0 mt-2 w-56 bg-white border rounded-lg shadow-lg z-50 py-3">
             {/* Swap Speaker Labels Option */}
             <button
               onClick={() => {
@@ -236,6 +233,17 @@ const Toolbar = ({
             >
               <FaExchangeAlt size={15} className="mr-6 text-gray-600 text-[12px] font-[400]" />
               <span>Swap Speaker Labels</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setShowAmpVolumeModal(true);
+                setDropdownOpen(false);
+              }}
+              className="flex items-center w-full px-6 py-4 text-[12px] hover:bg-gray-100"
+            >
+              <TbVolume size={15} className="mr-6 text-gray-600 text-[12px] font-[400]" />
+              <span>Amplify Audio</span> 
             </button>
           </div>
         )}
@@ -250,6 +258,15 @@ const Toolbar = ({
             handleReplaceClick={handleReplaceClick}
             setFromLabel={setFromLabel}
             setToLabel={setToLabel}
+          />  
+        )}
+
+        {/* Aplify Volume Modal */}
+        {showAmpVolumeModal && (
+          <AmplifyVolumeModal 
+            onClose={() => setShowAmpVolumeModal(false)} 
+            handleVolumeUpClick={handleSwapClick}
+            handleVolumeDownClick={handleReplaceClick}
           />
             
         )}
