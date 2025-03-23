@@ -141,18 +141,14 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
   const replaceAll = (findText, replaceText) => {
     if (!quillInstanceRef.current) return;
   
-    const regex = new RegExp(`\\b${findText}\\b`, 'g'); // Global match for whole words
-    const content = quillInstanceRef.current.getText();
+    const regex = new RegExp(`\\b${findText}\\b`, 'gi'); // Global & case-insensitive match for whole words
+    const content = quillInstanceRef.current.getText(); // Get full text
   
-    let match;
-    while ((match = regex.exec(content)) !== null) {
-      const index = match.index;
-      quillInstanceRef.current.deleteText(index, findText.length);
-      quillInstanceRef.current.insertText(index, replaceText);
+    // Replace all occurrences in one step
+    const newContent = content.replace(regex, replaceText);
   
-      // Adjust the regex index to account for the length difference
-      regex.lastIndex += replaceText.length - findText.length;
-    }
+    // Replace the full content in Quill
+    quillInstanceRef.current.setText(newContent);
   };
 
   const replaceSpeakerLabel = (fromLabel, toLabel) => {
