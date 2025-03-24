@@ -146,13 +146,13 @@ function App() {
       if (e.shiftKey && e.code === "ArrowLeft") {
         e.preventDefault(); // Prevent default behavior
         skipBack(); // Skip Backwards
-        togglePlayPause();
+        //togglePlayPause();
       }
   
       if (e.shiftKey && e.code === "ArrowRight") {
         e.preventDefault(); // Prevent default behavior
         skipForward(); // Skip Forwards
-        togglePlayPause();  
+        //togglePlayPause();  
       }
     };
   
