@@ -285,7 +285,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
     if (editorContainer) {
       editorContainer.style.font = `${fontSize}px Fira Code, sans-serif`; // Set font size and family
       editorContainer.style.padding = '20px'; // Set padding to 20px
-      editorContainer.style.setProperty('line-height', '42px', 'important'); // Adjust line height for better readability
+      editorContainer.style.setProperty('line-height', '38px', 'important'); // Adjust line height for better readability
       editorContainer.style.overflowY = 'auto'; // Enable vertical scrolling
       editorContainer.style.whiteSpace = 'pre-wrap'; // Preserve newlines and wrap text
       editorContainer.style.wordBreak = 'break-word'; // Break long words into the next line
