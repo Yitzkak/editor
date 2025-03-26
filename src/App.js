@@ -18,8 +18,24 @@ function App() {
   const [playbackSpeed, setPlaybackSpeed] = useState(1.0); // Default 100%
   const [currentTime, setCurrentTime] = useState(0);
 
+  const [audioContext, setAudioContext] = useState(null);
+  const [gainNode, setGainNode] = useState(null);
+  const [gainValue, setGainValue] = useState(1); // Default gain is 1 (normal volume)
+
   const editorRef = useRef(null);
   const audioPlayerRef = useRef(null);
+
+  const handleIncrease = () => {
+    if (audioPlayerRef.current) {
+      audioPlayerRef.current.volume = Math.min(1, audioPlayerRef.current.volume + 0.1);
+    }
+  };
+
+  const handleDecrease = () => {
+    if (audioPlayerRef.current) {
+      audioPlayerRef.current.volume = Math.max(0, audioPlayerRef.current.volume - 0.1);
+    }
+  };
 
   const handleAmplificationChange = (e) => {
     const value = parseFloat(e.target.value);
@@ -216,6 +232,8 @@ function App() {
             onSpeedChange={setPlaybackSpeed}
             onReplaceSpeakerLabel={handleReplaceSpeakerLabel} 
             onSwapSpeakerLabels={handleSwapSpeakerLabels} 
+            onIncrease={handleIncrease} 
+            onDecrease={handleDecrease}
           />
         </div>
 

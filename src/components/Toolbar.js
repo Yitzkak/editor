@@ -11,7 +11,6 @@ import { RiFindReplaceLine, RiFileUploadLine } from "react-icons/ri";
 import { MdMoreTime, MdSpeed } from "react-icons/md";
 import { FaExchangeAlt } from "react-icons/fa";
 
-
 const Toolbar = ({ 
   onFileUpload,
   togglePlayPause,
@@ -28,8 +27,11 @@ const Toolbar = ({
   onGetTimestamp,
   onInsertTimestamp,
   toggleFindReplace,
+  onAmplifyClick,
   handleAmplificationChange,
   amplification,
+  onIncrease, 
+  onDecrease,
   downloadTranscript,
   speed, 
   onSpeedChange,
@@ -38,11 +40,10 @@ const Toolbar = ({
   handlePreventBlur
 }) => {
   const fileInputRef = useRef(null);
-  const [showSpeedSlider, setShowSpeedSlider] = useState(false);
   const [speedInput, setSpeedInput] = useState(`${speed}%`);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [showSwapModal, setShowSwapModal] = useState(false);
-  const [showAmpVolumeModal, setShowAmpVolumeModal] = useState(false);
+  const [isAmplifyOpen, setIsAmplifyOpen] = useState(false);
 
   const [fromLabel, setFromLabel] = useState('S1');
   const [toLabel, setToLabel] = useState('S2');
@@ -226,7 +227,7 @@ const Toolbar = ({
             {/* Swap Speaker Labels Option */}
             <button
               onClick={() => {
-                setShowSwapModal(true);
+                setIsAmplifyOpen(true);
                 setDropdownOpen(false);
               }}
               className="flex items-center w-full px-6 py-4 text-[12px] hover:bg-gray-100"
@@ -237,7 +238,7 @@ const Toolbar = ({
 
             <button
               onClick={() => {
-                setShowAmpVolumeModal(true);
+                setIsAmplifyOpen(true);
                 setDropdownOpen(false);
               }}
               className="flex items-center w-full px-6 py-4 text-[12px] hover:bg-gray-100"
@@ -262,13 +263,13 @@ const Toolbar = ({
         )}
 
         {/* Aplify Volume Modal */}
-        {showAmpVolumeModal && (
-          <AmplifyVolumeModal 
-            onClose={() => setShowAmpVolumeModal(false)} 
-            handleVolumeUpClick={handleSwapClick}
-            handleVolumeDownClick={handleReplaceClick}
-          />
-            
+        {isAmplifyOpen && (
+        <AmplifyVolumeModal
+          isOpen={isAmplifyOpen}
+          onClose={() => setIsAmplifyOpen(false)}
+          onIncrease={onIncrease}
+          onDecrease={onDecrease}
+        />
         )}
       </div>
     </div>

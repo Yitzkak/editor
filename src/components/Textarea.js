@@ -212,9 +212,6 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
       placeholder: 'Start typing your transcription here...',
     });
 
-    console.log("Quill instance:", quill);
-    console.log("Quill keyboard module:", quill.keyboard);
-
     quill.keyboard.addBinding(
       { key: 13 }, // Enter key
       function () {
@@ -286,9 +283,9 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
     // Set fixed height and custom font
     const editorContainer = editorRef.current.querySelector('.ql-editor'); // Access the Quill editor content
     if (editorContainer) {
-      editorContainer.style.font = `${fontSize}px "Poppins", sans-serif`; // Set font size and family
+      editorContainer.style.font = `${fontSize}px Fira Code, sans-serif`; // Set font size and family
       editorContainer.style.padding = '20px'; // Set padding to 20px
-      editorContainer.style.setProperty('line-height', '30px', 'important'); // Adjust line height for better readability
+      editorContainer.style.setProperty('line-height', '42px', 'important'); // Adjust line height for better readability
       editorContainer.style.overflowY = 'auto'; // Enable vertical scrolling
       editorContainer.style.whiteSpace = 'pre-wrap'; // Preserve newlines and wrap text
       editorContainer.style.wordBreak = 'break-word'; // Break long words into the next line
@@ -351,7 +348,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
       {/* Quill editor container */}
       <div
         ref={editorRef}
-        className="font-poppins bg-white rounded-md h-full break-words word-space-2 whitespace-pre-wrap"
+        className="font-monox bg-white rounded-md h-full break-words word-space-2 whitespace-pre-wrap"
       ></div>
       {suggestions.length > 0 && (
         <div
