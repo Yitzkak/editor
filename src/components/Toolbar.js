@@ -2,6 +2,7 @@
 import React, { useRef, useState } from 'react';
 import SwapSpeakerModal from "./SwapSpeakerModal";
 import AmplifyVolumeModal from './AmplifyVolumeModal';
+import KeyboardShortcutsModal from './KeyboardShortcutsModal';
 
 //Icons import
 import { FiDownload, FiMoreHorizontal, FiZoomIn, FiZoomOut, FiSave } from 'react-icons/fi';
@@ -45,6 +46,7 @@ const Toolbar = ({
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [showSwapModal, setShowSwapModal] = useState(false);
   const [isAmplifyOpen, setIsAmplifyOpen] = useState(false);
+  const [showKeyboardShortcutsModal, setShowKeyboardShortcutsModal] = useState(false);
 
   const [fromLabel, setFromLabel] = useState('S1');
   const [toLabel, setToLabel] = useState('S2');
@@ -250,7 +252,7 @@ const Toolbar = ({
 
             <button
               onClick={() => {
-                setIsAmplifyOpen(true);
+                setShowKeyboardShortcutsModal(true);
                 setDropdownOpen(false);
               }}
               className="flex items-center w-full px-6 py-4 text-[12px] hover:bg-gray-100"
@@ -282,6 +284,14 @@ const Toolbar = ({
           onIncrease={onIncrease}
           onDecrease={onDecrease}
         />
+        )}
+
+        {/* Keyboard Shortcuts Modal*/}
+        {showKeyboardShortcutsModal && (
+          <KeyboardShortcutsModal
+            isOpen = {showKeyboardShortcutsModal}
+            onClose={() => setShowKeyboardShortcutsModal(false)}
+          />
         )}
       </div>
     </div>
