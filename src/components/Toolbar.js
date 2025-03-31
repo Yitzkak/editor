@@ -8,8 +8,9 @@ import { FiDownload, FiMoreHorizontal, FiZoomIn, FiZoomOut, FiSave } from 'react
 import { TbPlayerSkipBack, TbPlayerSkipForward, TbPlayerTrackNext, TbPlayerTrackPrev, TbVolume, TbVolume2 } from "react-icons/tb";
 import { PiPlayPauseBold } from "react-icons/pi";
 import { RiFindReplaceLine, RiFileUploadLine } from "react-icons/ri";
-import { MdMoreTime, MdSpeed } from "react-icons/md";
-import { FaExchangeAlt } from "react-icons/fa";
+import { MdMoreTime } from "react-icons/md";
+import { FaExchangeAlt, FaRegKeyboard  } from "react-icons/fa";
+
 
 const Toolbar = ({ 
   onFileUpload,
@@ -245,6 +246,17 @@ const Toolbar = ({
             >
               <TbVolume size={15} className="mr-6 text-gray-600 text-[12px] font-[400]" />
               <span>Amplify Audio</span> 
+            </button>
+
+            <button
+              onClick={() => {
+                setIsAmplifyOpen(true);
+                setDropdownOpen(false);
+              }}
+              className="flex items-center w-full px-6 py-4 text-[12px] hover:bg-gray-100"
+            >
+              <FaRegKeyboard  size={15} className="mr-6 text-gray-600 text-[12px] font-[400]" />
+              <span>Keyboard Shortcuts</span> 
             </button>
           </div>
         )}

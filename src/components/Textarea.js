@@ -2,7 +2,7 @@ import React, { useEffect, useState,useRef, useImperativeHandle, forwardRef } fr
 import Quill from 'quill';
 import 'quill/dist/quill.snow.css';
 
-const predefinedWords = ['Objection, form.', 'Object to form', '[overlapping conversation]', '[laughter]', '[pause]', '[chuckle]', '[automated voice]', '[background conversation]'];
+const predefinedWords = ['Objection, form.', 'Object to form', '[overlapping conversation]', '[laughter]', '[pause]', '[chuckle]', '[automated voice]', '[background conversation]', '[Foreign language]'];
 
 const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) => {
   const editorRef = useRef(null);
@@ -15,6 +15,67 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
   const [currentInput, setCurrentInput] = useState('');
 
   const suggestionsRef = useRef(suggestions);
+
+
+
+  // Function to capitalize all letters
+  const formatUppercase = () => {
+    if (!quillInstanceRef.current) return;
+  
+    const range = quillInstanceRef.current.getSelection();
+    if (range && range.length > 0) {
+      const selectedText = quillInstanceRef.current.getText(range.index, range.length);
+      const transformedText = selectedText.toUpperCase();
+  
+      quillInstanceRef.current.deleteText(range.index, range.length); 
+      quillInstanceRef.current.insertText(range.index, transformedText);
+    }
+  };
+  
+  // Function to capitalize the first letter of each word
+  const formatTitleCase = () => {
+    if (!quillInstanceRef.current) return;
+  
+    const range = quillInstanceRef.current.getSelection();
+    if (range && range.length > 0) {
+      const selectedText = quillInstanceRef.current.getText(range.index, range.length);
+      
+      const transformedText = selectedText
+        .toLowerCase()
+        .split(' ')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+  
+      quillInstanceRef.current.deleteText(range.index, range.length); 
+      quillInstanceRef.current.insertText(range.index, transformedText);
+    }
+  };
+
+  
+  // Function to format spellings
+  const formatSpelling = () => {
+    if (!quillInstanceRef.current) return;
+  
+    const range = quillInstanceRef.current.getSelection();
+    if (range && range.length > 0) {
+      const selectedText = quillInstanceRef.current.getText(range.index, range.length).trim();
+  
+      // Remove special characters except underscores, letters, and numbers
+      const cleanedText = selectedText.replace(/[^a-zA-Z0-9_ ]/g, '');
+  
+      // Check if it's a single word (no spaces except between letters)
+      const isSingleWord = cleanedText.split(' ').length === 1;
+  
+      // Format text with hyphens
+      const formattedText = isSingleWord
+        ? cleanedText.replace(/\s+/g, '').toUpperCase().split('').join('-') // Uppercase for single words
+        : cleanedText.split(' ').map(word => word.split('').join('-')).join(' ').toUpperCase(); // Keep case for multiple words
+  
+      // Replace the selected text with formatted text
+      quillInstanceRef.current.deleteText(range.index, range.length);
+      quillInstanceRef.current.insertText(range.index, formattedText);
+    }
+  };
 
   const getWordsFromTranscript = () => {
     if (!quillInstanceRef.current) return [];
@@ -83,21 +144,26 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
     return false;
   };
 
+  // Function to insert a timestamp
   const insertTimestamp = (timestamp) => {
     if (!quillInstanceRef.current) return;
 
     // Get the current selection
     const range = quillInstanceRef.current.getSelection();
     if (range) {
-      // Check if it's the start of a paragraph
-      const isStartOfParagraph = range.index === 0 || quillInstanceRef.current.getText(range.index - 1, 1) === "\n";
-      const formattedTimestamp = isStartOfParagraph ? `${timestamp} S1: ` : `[${timestamp}] ____ `;
+        // Check if it's the start of a paragraph
+        const isStartOfParagraph = range.index === 0 || quillInstanceRef.current.getText(range.index - 1, 1) === "\n";
+        const formattedTimestamp = isStartOfParagraph ? `${timestamp} S1: ` : `[${timestamp}] ____ `;
 
-      // Insert the timestamp at the selection index
-      quillInstanceRef.current.insertText(range.index, formattedTimestamp);
+        // Insert the timestamp at the selection index
+        quillInstanceRef.current.insertText(range.index, formattedTimestamp);
 
-      // Ensure the editor remains focused
-      //quillInstanceRef.current.focus();
+        // Calculate the position of "S1" number (right after "S")
+        const highlightStart = range.index + timestamp.length + 2; // Position of the number after "S"
+        const highlightEnd = highlightStart + 1; // Select just the number (e.g., "1")
+
+        // Set selection to highlight the number after "S"
+        quillInstanceRef.current.setSelection(highlightStart, 1);
     }
   };
 
@@ -242,14 +308,29 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
 
     const handleKeyDown = (event) => {
       if (event.key === 'Enter') {
-        if (suggestionsRef.current.length > 0) {
+        if (suggestionsRef?.current.length > 0) {
           event.preventDefault(); // Prevent default Enter behavior
           event.stopPropagation(); // Stop event propagation
       
           const firstSuggestion = suggestionsRef.current[0]; // Get first suggestion
-          handleSuggestionSelect(firstSuggestion, 1);
+
+          const offset = 1;
+          handleSuggestionSelect(firstSuggestion, offset);
           // return false;
         }
+      }
+      else if (event.altKey && event.key === 's') {
+        event.preventDefault(); // Prevent default behavior
+        formatSpelling();
+      }
+
+      else if (event.ctrlKey && event.key === 'u') {
+        event.preventDefault(); // Prevent default Ctrl + U behavior (which is usually underline)
+        formatUppercase(); // Function to capitalize all letters
+      }
+      else if (event.ctrlKey && event.key === 'g') {
+        event.preventDefault();
+        formatTitleCase(); // Function to capitalize first letter of each word
       }
     };
 
