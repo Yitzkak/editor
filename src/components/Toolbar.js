@@ -230,7 +230,7 @@ const Toolbar = ({
             {/* Swap Speaker Labels Option */}
             <button
               onClick={() => {
-                showSwapModal(true);
+                setShowSwapModal(true);
                 setDropdownOpen(false);
               }}
               className="flex items-center w-full px-6 py-4 text-[12px] hover:bg-gray-100"
