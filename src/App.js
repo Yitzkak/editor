@@ -17,6 +17,7 @@ function App() {
   const [amplification, setAmplification] = useState(1);
   const [playbackSpeed, setPlaybackSpeed] = useState(1.0); // Default 100%
   const [currentTime, setCurrentTime] = useState(0);
+  const [caseSensitive, setCaseSensitive] = useState(false);
 
   const [audioContext, setAudioContext] = useState(null);
   const [gainNode, setGainNode] = useState(null);
@@ -127,19 +128,19 @@ function App() {
 
   const handleFind = () => {
     if (editorRef.current && findText) {
-      editorRef.current.findAndHighlight(findText);
+      editorRef.current.findAndHighlight(findText, caseSensitive);
     }
   };
   
   const handleReplace = () => {
     if (editorRef.current && findText && replaceText) {
-      editorRef.current.replaceText(findText, replaceText);
+      editorRef.current.replaceText(findText, replaceText, caseSensitive);
     }
   };
   
   const handleReplaceAll = () => {
     if (editorRef.current && findText && replaceText) {
-      editorRef.current.replaceAll(findText, replaceText);
+      editorRef.current.replaceAll(findText, replaceText, caseSensitive);
     }
   };
 
@@ -257,6 +258,8 @@ function App() {
           handleReplace={handleReplace}
           handleFind={handleFind}
           handleReplaceAll={handleReplaceAll}
+          caseSensitive={caseSensitive}
+          setCaseSensitive={setCaseSensitive}
         />
       </div>
     </div>

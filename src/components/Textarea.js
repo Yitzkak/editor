@@ -16,8 +16,6 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
 
   const suggestionsRef = useRef(suggestions);
 
-
-
   // Function to capitalize all letters
   const formatUppercase = () => {
     if (!quillInstanceRef.current) return;
@@ -167,35 +165,38 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
     }
   };
 
-  const findAndHighlight = (text) => {
+  const findAndHighlight = (text, caseSensitive = false) => {
     if (!quillInstanceRef.current) return;
-  
     const content = quillInstanceRef.current.getText();
-    const regex = new RegExp(`\\b${text}\\b`); // Match whole words only
+    const flags = caseSensitive ? '' : 'i';
+    const regex = new RegExp(text, flags);
     const match = content.match(regex);
-  
     if (match) {
       const index = match.index;
       quillInstanceRef.current.setSelection(index, text.length);
       quillInstanceRef.current.formatText(index, text.length, { background: 'yellow' });
     } else {
-      alert('Whole word not found.');
+      alert('Text not found.');
     }
   };
 
-  const replaceText = (findText, replaceText) => {
+  function escapeRegExp(string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  const replaceText = (findText, replaceText, caseSensitive = false) => {
     if (!quillInstanceRef.current) return;
-  
+    const escapedFindText = escapeRegExp(findText);
+    const flags = caseSensitive ? '' : 'i';
+    const regex = new RegExp(escapedFindText, flags);
     const content = quillInstanceRef.current.getText();
-    const regex = new RegExp(`\\b${findText}\\b`); // Match whole words only
     const match = content.match(regex);
-  
     if (match) {
       const index = match.index;
       quillInstanceRef.current.deleteText(index, findText.length);
       quillInstanceRef.current.insertText(index, replaceText);
     } else {
-      alert('Whole word not found.');
+      alert('Text not found.');
     }
   };
 
@@ -204,16 +205,13 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
     return quillInstanceRef.current.getText();
   };
 
-  const replaceAll = (findText, replaceText) => {
+  const replaceAll = (findText, replaceText, caseSensitive = false) => {
     if (!quillInstanceRef.current) return;
-  
-    const regex = new RegExp(`\\b${findText}\\b`, 'gi'); // Global & case-insensitive match for whole words
-    const content = quillInstanceRef.current.getText(); // Get full text
-  
-    // Replace all occurrences in one step
+    const escapedFindText = escapeRegExp(findText);
+    const flags = 'g' + (caseSensitive ? '' : 'i');
+    const regex = new RegExp(escapedFindText, flags);
+    const content = quillInstanceRef.current.getText();
     const newContent = content.replace(regex, replaceText);
-  
-    // Replace the full content in Quill
     quillInstanceRef.current.setText(newContent);
   };
 

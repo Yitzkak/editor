@@ -10,6 +10,8 @@ const FindReplaceModal = ({
   handleFind,
   handleReplace,
   handleReplaceAll,
+  caseSensitive,
+  setCaseSensitive,
 }) => {
   if (!isOpen) return null;
 
@@ -34,6 +36,16 @@ const FindReplaceModal = ({
             value={replaceText}
             onChange={(e) => setReplaceText(e.target.value)}
           />
+        </div>
+        <div className="mb-4 flex items-center">
+          <input
+            id="caseSensitiveCheckbox"
+            type="checkbox"
+            checked={caseSensitive}
+            onChange={e => setCaseSensitive(e.target.checked)}
+            className="mr-2"
+          />
+          <label htmlFor="caseSensitiveCheckbox" className="text-sm">Case sensitive</label>
         </div>
         <div className="flex justify-between">
           <button
