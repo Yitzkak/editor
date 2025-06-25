@@ -2,7 +2,7 @@ import React, { useEffect, useRef, forwardRef, useImperativeHandle } from 'react
 import WaveSurfer from 'wavesurfer.js';
 import "../App.css";
 
-const AudioPlayer = forwardRef(({ audioFile, volume, amplification = 1, speed }, ref) => {
+const AudioPlayer = forwardRef(({ audioFile, volume, amplification = 1, speed, setAudioLoading }, ref) => {
   const waveformRef = useRef(null);
   const wavesurfer = useRef(null);
   const gainNode = useRef(null); // Gain node for volume boost
@@ -108,6 +108,10 @@ const AudioPlayer = forwardRef(({ audioFile, volume, amplification = 1, speed },
     if (audioFile && wavesurfer.current) {
       const fileUrl = URL.createObjectURL(audioFile);
       wavesurfer.current.load(fileUrl);
+      if (setAudioLoading) setAudioLoading(true);
+      wavesurfer.current.once('ready', () => {
+        if (setAudioLoading) setAudioLoading(false);
+      });
     }
   }, [audioFile]);
 

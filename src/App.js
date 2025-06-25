@@ -18,6 +18,7 @@ function App() {
   const [playbackSpeed, setPlaybackSpeed] = useState(1.0); // Default 100%
   const [currentTime, setCurrentTime] = useState(0);
   const [caseSensitive, setCaseSensitive] = useState(false);
+  const [audioLoading, setAudioLoading] = useState(false);
 
   const [audioContext, setAudioContext] = useState(null);
   const [gainNode, setGainNode] = useState(null);
@@ -46,6 +47,7 @@ function App() {
 
   // Function to handle file selection
   const handleFileUpload = (file) => {
+    setAudioLoading(true);
     setAudioFile(file);
   };
 
@@ -197,14 +199,21 @@ function App() {
   return (
     <div className="flex justify-center min-w-96  bg-gray-100 p-[5px] h-screen" >
       <div className="flex flex-col max-h-full items-center w-full max-w-6xl rounded-sm">
+        {audioLoading && (
+          <div className="fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-50 z-50">
+            <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-blue-500 border-solid"></div>
+            <span className="ml-4 text-white text-xl">Loading audio...</span>
+          </div>
+        )}
         {/* Audio player at the top */}
         <div className="w-full">
-        <AudioPlayer 
-          ref={audioPlayerRef} 
-          audioFile={audioFile} 
-          volume={volume || 1} 
-          speed={playbackSpeed}
-        />
+          <AudioPlayer 
+            ref={audioPlayerRef} 
+            audioFile={audioFile} 
+            volume={volume || 1} 
+            speed={playbackSpeed}
+            setAudioLoading={setAudioLoading}
+          />
         </div>
         
         {/* Toolbar at the top, passing handleFileUpload */}
