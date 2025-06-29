@@ -196,6 +196,26 @@ function App() {
     }
   };
 
+  const handleWaveformClick = (time) => {
+    if (editorRef.current) {
+      console.log('handleWaveformClick', time);
+      editorRef.current.navigateToTime(time);
+    }
+  };
+
+  const handleTimestampClick = (time) => {
+    if (audioPlayerRef.current) {
+      audioPlayerRef.current.seekTo(time);
+    }
+  };
+
+  // Enable bidirectional navigation when audio is loaded
+  useEffect(() => {
+    if (editorRef.current && audioFile) {
+      editorRef.current.makeTimestampsClickable(handleTimestampClick);
+    }
+  }, [audioFile]);
+
   return (
     <div className="flex justify-center min-w-96  bg-gray-100 p-[5px] h-screen" >
       <div className="flex flex-col max-h-full items-center w-full max-w-6xl rounded-sm">
@@ -213,6 +233,7 @@ function App() {
             volume={volume || 1} 
             speed={playbackSpeed}
             setAudioLoading={setAudioLoading}
+            onWaveformClick={handleWaveformClick}
           />
         </div>
         

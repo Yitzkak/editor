@@ -39,3 +39,23 @@
   /* Variable height for a waveform look */
   height: calc(10px + 20 * (var(--random-factor, 1)));
 }
+
+/* Clickable timestamp styles */
+.clickable-timestamp {
+  cursor: pointer !important;
+  color: #3b82f6 !important;
+  text-decoration: underline !important;
+  transition: all 0.2s ease;
+}
+
+.clickable-timestamp:hover {
+  color: #1d4ed8 !important;
+  text-decoration: none !important;
+  background-color: rgba(59, 130, 246, 0.1);
+  border-radius: 2px;
+  padding: 1px 2px;
+}
+
+.clickable-timestamp:active {
+  transform: scale(0.98);
+}

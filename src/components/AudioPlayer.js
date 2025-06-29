@@ -2,7 +2,7 @@ import React, { useEffect, useRef, forwardRef, useImperativeHandle } from 'react
 import WaveSurfer from 'wavesurfer.js';
 import "../App.css";
 
-const AudioPlayer = forwardRef(({ audioFile, volume, amplification = 1, speed, setAudioLoading }, ref) => {
+const AudioPlayer = forwardRef(({ audioFile, volume, amplification = 1, speed, setAudioLoading, onWaveformClick }, ref) => {
   const waveformRef = useRef(null);
   const wavesurfer = useRef(null);
   const gainNode = useRef(null); // Gain node for volume boost
@@ -75,10 +75,23 @@ const AudioPlayer = forwardRef(({ audioFile, volume, amplification = 1, speed, s
         hoverTime.style.display = 'none';  // Hide the hover time when mouse leaves the waveform
     };
 
+    // Add click event listener for waveform navigation
+    const handleWaveformClick = (e) => {
+      if (wavesurfer.current && onWaveformClick) {
+        const rect = waveformRef.current.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const duration = wavesurfer.current.getDuration();
+        const percent = x / rect.width;
+        const time = percent * duration;
+        onWaveformClick(time);
+      }
+    };
+
     // Attach event listeners to the waveform container
     if (waveformRef.current) {
         waveformRef.current.addEventListener('mousemove', handleMouseMove);
         waveformRef.current.addEventListener('mouseout', handleMouseOut);
+        waveformRef.current.addEventListener('click', handleWaveformClick);
     }
       wavesurfer.current.on('ready', () => {
         // Ensure backend is initialized before accessing `ac`

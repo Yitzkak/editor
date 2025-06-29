@@ -15,6 +15,8 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
   const [currentInput, setCurrentInput] = useState('');
 
   const suggestionsRef = useRef(suggestions);
+  const [timestampIndex, setTimestampIndex] = useState([]);
+  const [onTimestampClick, setOnTimestampClick] = useState(null);
 
   // Function to capitalize all letters
   const formatUppercase = () => {
@@ -49,7 +51,6 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
     }
   };
 
-  
   // Function to format spellings
   const formatSpelling = () => {
     if (!quillInstanceRef.current) return;
@@ -248,6 +249,228 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
     setHighlightedText(updatedText); // Update state
   };
 
+  // Create timestamp index for faster lookup
+  const createTimestampIndex = (content) => {
+    const timestamps = [];
+    const lines = content.split('\n');
+    
+    let charIndex = 0;
+    lines.forEach((line, index) => {
+      const match = line.match(/^(\d+):(\d+):(\d+\.?\d*)\s+S\d+:/);
+      if (match) {
+        const hours = parseInt(match[1]);
+        const minutes = parseInt(match[2]);
+        const seconds = parseFloat(match[3]);
+        const time = hours * 3600 + minutes * 60 + seconds;
+        
+        timestamps.push({ 
+          time, 
+          lineIndex: index, 
+          charIndex: charIndex,
+          text: line 
+        });
+      }
+      charIndex += line.length + 1; // +1 for newline
+    });
+    
+    return timestamps.sort((a, b) => a.time - b.time);
+  };
+
+  // Binary search for faster timestamp lookup
+  const findClosestTimestamp = (targetTime, timestamps) => {
+    if (timestamps.length === 0) return null;
+    
+    let left = 0;
+    let right = timestamps.length - 1;
+    let closest = timestamps[0];
+    let closestDiff = Math.abs(timestamps[0].time - targetTime);
+    
+    while (left <= right) {
+      const mid = Math.floor((left + right) / 2);
+      const current = timestamps[mid];
+      const diff = Math.abs(current.time - targetTime);
+      
+      if (diff < closestDiff) {
+        closestDiff = diff;
+        closest = current;
+      }
+      
+      if (current.time < targetTime) {
+        left = mid + 1;
+      } else {
+        right = mid - 1;
+      }
+    }
+    
+    return closest;
+  };
+
+  const navigateToTime = (targetTime) => {
+    if (!quillInstanceRef.current || timestampIndex.length === 0) return;
+
+    console.log('navigateToTime', targetTime);
+    console.log('timestampIndex', timestampIndex);
+    
+    const closest = findClosestTimestamp(targetTime, timestampIndex);
+    if (closest) {
+      // Set selection to that position
+      quillInstanceRef.current.setSelection(closest.charIndex, 0);
+      
+      // Small delay to ensure selection is applied before calculating bounds
+      setTimeout(() => {
+        // Get the editor container
+        const editorContainer = editorRef.current.querySelector('.ql-editor');
+        if (editorContainer) {
+          // Get the bounds of the target position
+          const bounds = quillInstanceRef.current.getBounds(closest.charIndex);
+          console.log('bounds', bounds);
+          console.log('bounds.top', bounds.top);
+          console.log('bounds.left', bounds.left);
+          console.log('bounds.width', bounds.width);
+          console.log('bounds.height', bounds.height);
+          
+          // Calculate the scroll position
+          const containerHeight = editorContainer.clientHeight;
+          const scrollTop = bounds.top - 50; // Position near the top with 50px offset
+          
+          // Ensure scroll position is within bounds
+          const maxScroll = editorContainer.scrollHeight - containerHeight;
+          const finalScrollTop = Math.max(0, Math.min(scrollTop, maxScroll));
+          
+          console.log('containerHeight', containerHeight);
+          console.log('scrollHeight', editorContainer.scrollHeight);
+          console.log('scrollTop calculated', scrollTop);
+          console.log('maxScroll', maxScroll);
+          console.log('finalScrollTop', finalScrollTop);
+          
+          // Apply the scroll
+          editorContainer.scrollTop = finalScrollTop;
+          console.log('editorContainer scrollTop I ran', editorContainer.scrollTop);
+          
+          // Alternative: Find the actual text element and scroll it into view
+          try {
+            // Get the text content around the timestamp
+            const textAround = quillInstanceRef.current.getText(Math.max(0, closest.charIndex - 10), 50);
+            console.log('textAround', textAround);
+            
+            // Find the timestamp in the text
+            const timestampMatch = textAround.match(/(\d+:\d+:\d+\.?\d*)\s+S\d+:/);
+            if (timestampMatch) {
+              // Find the DOM element containing this text
+              const textNodes = editorContainer.querySelectorAll('*');
+              for (let node of textNodes) {
+                if (node.textContent && node.textContent.includes(timestampMatch[0])) {
+                  console.log('Found element with timestamp:', node);
+                  node.scrollIntoView({ 
+                    behavior: 'smooth', 
+                    block: 'center',
+                    inline: 'nearest'
+                  });
+                  break;
+                }
+              }
+            }
+          } catch (error) {
+            console.log('scrollIntoView failed, using manual scroll', error);
+          }
+        }
+      }, 50); // 50ms delay
+    }
+  };
+
+  // Make timestamps clickable
+  const makeTimestampsClickable = (callback) => {
+    setOnTimestampClick(() => callback);
+    
+    if (quillInstanceRef.current) {
+      // Add a click handler to the entire editor
+      const editorContainer = editorRef.current.querySelector('.ql-editor');
+      if (editorContainer) {
+        // Remove existing click handler
+        editorContainer.removeEventListener('click', handleEditorTimestampClick);
+        
+        // Add new click handler
+        editorContainer.addEventListener('click', handleEditorTimestampClick);
+      }
+    }
+  };
+
+  // Handle clicks on timestamps within the editor
+  const handleEditorTimestampClick = (e) => {
+    if (!onTimestampClick || !quillInstanceRef.current) return;
+    
+    // Get the clicked position
+    const range = quillInstanceRef.current.getSelection();
+    if (!range) return;
+    
+    // Get text around the clicked position
+    const textBefore = quillInstanceRef.current.getText(Math.max(0, range.index - 30), 30);
+    const textAfter = quillInstanceRef.current.getText(range.index, 30);
+    const surroundingText = textBefore + textAfter;
+    
+    // Look for timestamp pattern around the click
+    const timestampMatch = surroundingText.match(/(\d+):(\d+):(\d+\.?\d*)\s+S\d+:/);
+    if (timestampMatch) {
+      const hours = parseInt(timestampMatch[1]);
+      const minutes = parseInt(timestampMatch[2]);
+      const seconds = parseFloat(timestampMatch[3]);
+      const time = hours * 3600 + minutes * 60 + seconds;
+      
+      // Add visual feedback
+      highlightClickedTimestamp(range.index);
+      
+      // Call the callback with the timestamp time
+      onTimestampClick(time);
+    }
+  };
+
+  // Add visual feedback when timestamp is clicked
+  const highlightClickedTimestamp = (clickIndex) => {
+    if (!quillInstanceRef.current) return;
+    
+    // Find the timestamp around the click
+    const textBefore = quillInstanceRef.current.getText(Math.max(0, clickIndex - 30), 30);
+    const textAfter = quillInstanceRef.current.getText(clickIndex, 30);
+    const surroundingText = textBefore + textAfter;
+    
+    const timestampMatch = surroundingText.match(/(\d+):(\d+):(\d+\.?\d*)\s+S\d+:/);
+    if (timestampMatch) {
+      const timestampText = timestampMatch[0];
+      const timestampStart = surroundingText.indexOf(timestampText);
+      const actualStart = Math.max(0, clickIndex - 30) + timestampStart;
+      
+      // Highlight the timestamp briefly
+      quillInstanceRef.current.formatText(actualStart, timestampText.length, { 
+        background: '#3b82f6',
+        color: 'white'
+      });
+      
+      // Remove highlight after 500ms
+      setTimeout(() => {
+        quillInstanceRef.current.formatText(actualStart, timestampText.length, { 
+          background: false,
+          color: false
+        });
+      }, 500);
+    }
+  };
+
+  // Update timestamp index when content changes
+  useEffect(() => {
+    if (quillInstanceRef.current) {
+      const content = quillInstanceRef.current.getText();
+      const index = createTimestampIndex(content);
+      setTimestampIndex(index);
+    }
+  }, [transcript]); // Only depend on transcript changes
+
+  // Apply click handlers when onTimestampClick changes
+  useEffect(() => {
+    if (onTimestampClick && quillInstanceRef.current) {
+      makeTimestampsClickable(onTimestampClick);
+    }
+  }, [onTimestampClick]);
+
   // Expose the `insertTimestamp` method to the parent component
   useImperativeHandle(ref, () => ({
     insertTimestamp,
@@ -256,7 +479,9 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
     replaceAll,
     getText,
     replaceSpeakerLabel,
-    swapSpeakerLabels, 
+    swapSpeakerLabels,
+    navigateToTime,
+    makeTimestampsClickable,
   }));
 
   useEffect(() => {
@@ -428,6 +653,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
       <div
         ref={editorRef}
         className="font-monox bg-white rounded-md h-full break-words word-space-2 whitespace-pre-wrap"
+        title="Click on timestamps (like '0:00:36.4 S2:') to jump to that time in the audio"
       ></div>
       {suggestions.length > 0 && (
         <div
@@ -437,7 +663,10 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
           {suggestions.map((word, index) => (
             <div key={index} 
             onClick={() => handleSuggestionSelect(word, 0)} 
-            className="hover:bg-gray-200 p-1 cursor-pointer">{word}</div>
+            className="cursor-pointer hover:bg-gray-100 p-1 rounded"
+            >
+              {word}
+            </div>
           ))}
         </div>
       )}
