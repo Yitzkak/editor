@@ -320,7 +320,9 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
       setTimeout(() => {
         // Get the editor container
         const editorContainer = editorRef.current.querySelector('.ql-editor');
+
         if (editorContainer) {
+          console.log('Inside editorContainer', editorContainer);
           // Get the bounds of the target position
           const bounds = quillInstanceRef.current.getBounds(closest.charIndex);
           console.log('bounds', bounds);
@@ -534,7 +536,6 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
         if (suggestionsRef?.current.length > 0) {
           event.preventDefault(); // Prevent default Enter behavior
           event.stopPropagation(); // Stop event propagation
-      
           const firstSuggestion = suggestionsRef.current[0]; // Get first suggestion
 
           const offset = 1;
