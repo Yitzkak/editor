@@ -77,13 +77,23 @@ const AudioPlayer = forwardRef(({ audioFile, volume, amplification = 1, speed, s
 
     // Add click event listener for waveform navigation
     const handleWaveformClick = (e) => {
+      console.log('handleWaveformClick called');
       if (wavesurfer.current && onWaveformClick) {
+        console.log('wavesurfer and onWaveformClick exist');
         const rect = waveformRef.current.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const duration = wavesurfer.current.getDuration();
         const percent = x / rect.width;
         const time = percent * duration;
+        console.log('handleWaveformClick', time);
+        console.log('Calling onWaveformClick with time:', time);
         onWaveformClick(time);
+        console.log('onWaveformClick called successfully');
+      } else {
+        console.log('Missing wavesurfer or onWaveformClick:', {
+          hasWavesurfer: !!wavesurfer.current,
+          hasOnWaveformClick: !!onWaveformClick
+        });
       }
     };
 

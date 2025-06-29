@@ -197,9 +197,14 @@ function App() {
   };
 
   const handleWaveformClick = (time) => {
+    console.log('App.js handleWaveformClick called with time:', time);
+    console.log('editorRef.current exists:', !!editorRef.current);
     if (editorRef.current) {
-      console.log('handleWaveformClick', time);
+      console.log('Calling editorRef.current.navigateToTime');
       editorRef.current.navigateToTime(time);
+      console.log('navigateToTime called successfully');
+    } else {
+      console.log('editorRef.current is null');
     }
   };
 

@@ -306,7 +306,14 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
   };
 
   const navigateToTime = (targetTime) => {
-    if (!quillInstanceRef.current || timestampIndex.length === 0) return;
+    console.log('Textarea.js navigateToTime called with targetTime:', targetTime);
+    console.log('quillInstanceRef.current exists:', !!quillInstanceRef.current);
+    console.log('timestampIndex length:', timestampIndex.length);
+    
+    if (!quillInstanceRef.current || timestampIndex.length === 0) {
+      console.log('Early return - missing quillInstance or empty timestampIndex');
+      return;
+    }
 
     console.log('navigateToTime', targetTime);
     console.log('timestampIndex', timestampIndex);
