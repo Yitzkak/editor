@@ -2,7 +2,12 @@ import React, { useEffect, useState,useRef, useImperativeHandle, forwardRef } fr
 import Quill from 'quill';
 import 'quill/dist/quill.snow.css';
 
-const predefinedWords = ['Objection, form.', 'Object to form', '[overlapping conversation]', '[laughter]', '[pause]', '[chuckle]', '[automated voice]', '[background conversation]', '[Foreign language]'];
+const predefinedWords = [
+  'Objection, form.', 
+  'Object to form', 
+  '[overlapping conversation]', '[laughter]', '[pause]', '[chuckle]', 
+  '[automated voice]', '[video playback]',
+  '[background conversation]', '[foreign language]', '[vocalization]'];
 
 const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) => {
   const editorRef = useRef(null);
@@ -26,6 +31,10 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
     timestamp: null,
     clickIndex: 0
   });
+
+  const contextMenuRef = useRef(null);
+
+  const lastMenuOpenTimeRef = useRef(0);
 
   // Function to capitalize all letters
   const formatUppercase = () => {
@@ -315,17 +324,9 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
   };
 
   const navigateToTime = (targetTime) => {
-    console.log('Textarea.js navigateToTime called with targetTime:', targetTime);
-    console.log('quillInstanceRef.current exists:', !!quillInstanceRef.current);
-    console.log('timestampIndex length:', timestampIndex.length);
-    
     if (!quillInstanceRef.current || timestampIndex.length === 0) {
-      console.log('Early return - missing quillInstance or empty timestampIndex');
       return;
     }
-
-    console.log('navigateToTime', targetTime);
-    console.log('timestampIndex', timestampIndex);
     
     const closest = findClosestTimestamp(targetTime, timestampIndex);
     if (closest) {
@@ -338,14 +339,8 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
         const editorContainer = editorRef.current.querySelector('.ql-editor');
 
         if (editorContainer) {
-          console.log('Inside editorContainer', editorContainer);
           // Get the bounds of the target position
           const bounds = quillInstanceRef.current.getBounds(closest.charIndex);
-          console.log('bounds', bounds);
-          console.log('bounds.top', bounds.top);
-          console.log('bounds.left', bounds.left);
-          console.log('bounds.width', bounds.width);
-          console.log('bounds.height', bounds.height);
           
           // Calculate the scroll position
           const containerHeight = editorContainer.clientHeight;
@@ -355,16 +350,8 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
           const maxScroll = editorContainer.scrollHeight - containerHeight;
           const finalScrollTop = Math.max(0, Math.min(scrollTop, maxScroll));
           
-          console.log('containerHeight', containerHeight);
-          console.log('scrollHeight', editorContainer.scrollHeight);
-          console.log('scrollTop calculated', scrollTop);
-          console.log('maxScroll', maxScroll);
-          console.log('finalScrollTop', finalScrollTop);
-          
           // Apply the scroll
           editorContainer.scrollTop = finalScrollTop;
-          console.log('editorContainer scrollTop I ran', editorContainer.scrollTop);
-          
           // Alternative: Find the actual text element and scroll it into view
           try {
             // Get the text content around the timestamp
@@ -415,38 +402,26 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
 
   // Handle right-clicks on timestamps within the editor
   const handleEditorRightClick = (e) => {
+    console.log('Right-click detected in editor');
     if (!onTimestampClick || !quillInstanceRef.current) return;
-    
-    // Prevent default context menu
-    e.preventDefault();
-    
     // Get the clicked position
     const range = quillInstanceRef.current.getSelection();
     if (!range) return;
-    
     // Get text around the clicked position
     const textBefore = quillInstanceRef.current.getText(Math.max(0, range.index - 30), 30);
     const textAfter = quillInstanceRef.current.getText(range.index, 30);
     const surroundingText = textBefore + textAfter;
-    
-    // Look for timestamp pattern around the click
     const timestampMatch = surroundingText.match(/(\d+):(\d+):(\d+\.?\d*)\s+S\d+:/);
+    console.log('surroundingText:', surroundingText);
+    console.log('timestampMatch:', timestampMatch);
     if (timestampMatch) {
-      const hours = parseInt(timestampMatch[1]);
-      const minutes = parseInt(timestampMatch[2]);
-      const seconds = parseFloat(timestampMatch[3]);
-      const time = hours * 3600 + minutes * 60 + seconds;
-      
-      // Show context menu with adjusted positioning
-      const rect = editorRef.current.getBoundingClientRect();
-      const x = Math.min(e.clientX, window.innerWidth - 120); // Prevent overflow
-      const y = Math.min(e.clientY, window.innerHeight - 50); // Prevent overflow
-      
+      e.preventDefault();
+      lastMenuOpenTimeRef.current = Date.now(); // Track when menu is opened
       setContextMenu({
         visible: true,
-        x: x,
-        y: y,
-        timestamp: time,
+        x: e.clientX,
+        y: e.clientY,
+        timestamp: parseInt(timestampMatch[1]) * 3600 + parseInt(timestampMatch[2]) * 60 + parseFloat(timestampMatch[3]),
         clickIndex: range.index
       });
     }
@@ -468,13 +443,14 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
 
   // Handle clicks outside to close suggestions and context menu
   const handleClickOutside = (event) => {
-    if (editorRef.current && !editorRef.current.contains(event.target)) {
+    // Ignore the first event after opening the menu
+    if (Date.now() - lastMenuOpenTimeRef.current < 150) return;
+    const menuContains = contextMenuRef.current && contextMenuRef.current.contains(event.target);
+    if (!menuContains) {
       setSuggestions([]);
       setContextMenu({ visible: false, x: 0, y: 0, timestamp: null, clickIndex: 0 });
     }
   };
-
-
 
   // Add visual feedback when timestamp is clicked
   const highlightClickedTimestamp = (clickIndex) => {
@@ -687,14 +663,38 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
     };
   }, [fontSize]);
 
+  // Attach right-click handler only once on mount
   useEffect(() => {
-    document.addEventListener("click", handleClickOutside);
+    const editorContainer = editorRef.current && editorRef.current.querySelector('.ql-editor');
+    if (!editorContainer) return;
+    editorContainer.addEventListener('contextmenu', handleEditorRightClick);
+    return () => {
+      editorContainer.removeEventListener('contextmenu', handleEditorRightClick);
+    };
+  }, []); // Only on mount
+
+  // Only add the global click/contextmenu handler when the context menu is visible
+  useEffect(() => {
+    if (!contextMenu.visible) return;
+    document.addEventListener("mousedown", handleClickOutside);
     document.addEventListener("contextmenu", handleClickOutside);
     return () => {
-      document.removeEventListener("click", handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("contextmenu", handleClickOutside);
-    } 
-  }, []);
+    };
+  }, [contextMenu.visible]);
+
+  useEffect(() => {
+    const editorContainer = editorRef.current && editorRef.current.querySelector('.ql-editor');
+    if (!editorContainer) return;
+    editorContainer.addEventListener('contextmenu', handleEditorRightClick);
+    return () => {
+      editorContainer.removeEventListener('contextmenu', handleEditorRightClick);
+    };
+  }, [editorRef]);
+
+  // Debug: log contextMenu before return
+  console.log('contextMenu state:', contextMenu);
 
   return (
     <div className="w-full h-[460px] shadow-lg border relative">
@@ -723,6 +723,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
       {/* Context Menu */}
       {contextMenu.visible && (
         <div
+          ref={contextMenuRef}
           className="fixed bg-white border border-gray-300 shadow-xl rounded-lg py-1 z-50"
           style={{
             top: contextMenu.y,

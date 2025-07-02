@@ -74,7 +74,6 @@ function App() {
       const newVolume = Math.min(prev + 0.1, 1);
       return Math.round(newVolume * 10) / 10; // Round to one decimal place
     });
-    console.log('increaseVolume', volume);
   };
 
   function decreaseVolume() {
@@ -83,7 +82,6 @@ function App() {
       const newVolume = Math.max(prevVolume - 0.1, 0);
       return Math.round(newVolume * 10) / 10; // Round to one decimal place
     });
-    console.log('decreaseVolume', volume);
   }
 
   // Font size control
@@ -211,6 +209,7 @@ function App() {
   const handleTimestampClick = (time) => {
     if (audioPlayerRef.current) {
       audioPlayerRef.current.seekTo(time);
+      audioPlayerRef.current.playAudio();
     }
   };
 
