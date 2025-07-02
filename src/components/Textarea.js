@@ -18,6 +18,15 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
   const [timestampIndex, setTimestampIndex] = useState([]);
   const [onTimestampClick, setOnTimestampClick] = useState(null);
 
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState({
+    visible: false,
+    x: 0,
+    y: 0,
+    timestamp: null,
+    clickIndex: 0
+  });
+
   // Function to capitalize all letters
   const formatUppercase = () => {
     if (!quillInstanceRef.current) return;
@@ -392,21 +401,24 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
     setOnTimestampClick(() => callback);
     
     if (quillInstanceRef.current) {
-      // Add a click handler to the entire editor
+      // Add a right-click handler to the entire editor
       const editorContainer = editorRef.current.querySelector('.ql-editor');
       if (editorContainer) {
-        // Remove existing click handler
-        editorContainer.removeEventListener('click', handleEditorTimestampClick);
+        // Remove existing handlers
+        editorContainer.removeEventListener('contextmenu', handleEditorRightClick);
         
-        // Add new click handler
-        editorContainer.addEventListener('click', handleEditorTimestampClick);
+        // Add new right-click handler
+        editorContainer.addEventListener('contextmenu', handleEditorRightClick);
       }
     }
   };
 
-  // Handle clicks on timestamps within the editor
-  const handleEditorTimestampClick = (e) => {
+  // Handle right-clicks on timestamps within the editor
+  const handleEditorRightClick = (e) => {
     if (!onTimestampClick || !quillInstanceRef.current) return;
+    
+    // Prevent default context menu
+    e.preventDefault();
     
     // Get the clicked position
     const range = quillInstanceRef.current.getSelection();
@@ -425,13 +437,44 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
       const seconds = parseFloat(timestampMatch[3]);
       const time = hours * 3600 + minutes * 60 + seconds;
       
-      // Add visual feedback
-      highlightClickedTimestamp(range.index);
+      // Show context menu with adjusted positioning
+      const rect = editorRef.current.getBoundingClientRect();
+      const x = Math.min(e.clientX, window.innerWidth - 120); // Prevent overflow
+      const y = Math.min(e.clientY, window.innerHeight - 50); // Prevent overflow
       
-      // Call the callback with the timestamp time
-      onTimestampClick(time);
+      setContextMenu({
+        visible: true,
+        x: x,
+        y: y,
+        timestamp: time,
+        clickIndex: range.index
+      });
     }
   };
+
+  // Handle context menu item click
+  const handleContextMenuClick = (action) => {
+    if (action === 'play' && contextMenu.timestamp && onTimestampClick) {
+      // Add visual feedback
+      highlightClickedTimestamp(contextMenu.clickIndex);
+      
+      // Call the callback with the timestamp time
+      onTimestampClick(contextMenu.timestamp);
+    }
+    
+    // Hide context menu
+    setContextMenu({ visible: false, x: 0, y: 0, timestamp: null, clickIndex: 0 });
+  };
+
+  // Handle clicks outside to close suggestions and context menu
+  const handleClickOutside = (event) => {
+    if (editorRef.current && !editorRef.current.contains(event.target)) {
+      setSuggestions([]);
+      setContextMenu({ visible: false, x: 0, y: 0, timestamp: null, clickIndex: 0 });
+    }
+  };
+
+
 
   // Add visual feedback when timestamp is clicked
   const highlightClickedTimestamp = (clickIndex) => {
@@ -568,6 +611,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
     // quill.on('selection-change', handleSelectionChange);
     quill.root.addEventListener('click', handleEditorClick);
     quill.root.addEventListener('keydown', handleKeyDown);
+    quill.root.addEventListener('contextmenu', handleEditorRightClick);
 
     quill.on('text-change', () => {
       handleTextChange();
@@ -639,19 +683,16 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
       quill.off('text-change'); // Clean up on component unmount
       quill.root.removeEventListener('click', handleEditorClick);
       quill.root.removeEventListener('keydown', handleKeyDown);
+      quill.root.removeEventListener('contextmenu', handleEditorRightClick);
     };
   }, [fontSize]);
 
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (editorRef.current && !editorRef.current.contains(event.target)) {
-        setSuggestions([]);
-      }
-    };
-  
     document.addEventListener("click", handleClickOutside);
+    document.addEventListener("contextmenu", handleClickOutside);
     return () => {
       document.removeEventListener("click", handleClickOutside);
+      document.removeEventListener("contextmenu", handleClickOutside);
     } 
   }, []);
 
@@ -661,7 +702,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
       <div
         ref={editorRef}
         className="font-monox bg-white rounded-md h-full break-words word-space-2 whitespace-pre-wrap"
-        title="Click on timestamps (like '0:00:36.4 S2:') to jump to that time in the audio"
+        title="Right-click on timestamps (like '0:00:36.4 S2:') to play audio from that point"
       ></div>
       {suggestions.length > 0 && (
         <div
@@ -676,6 +717,28 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
               {word}
             </div>
           ))}
+        </div>
+      )}
+      
+      {/* Context Menu */}
+      {contextMenu.visible && (
+        <div
+          className="fixed bg-white border border-gray-300 shadow-xl rounded-lg py-1 z-50"
+          style={{
+            top: contextMenu.y,
+            left: contextMenu.x,
+            minWidth: '140px'
+          }}
+        >
+          <div
+            className="px-4 py-2 hover:bg-blue-50 cursor-pointer text-sm font-medium text-gray-700 flex items-center"
+            onClick={() => handleContextMenuClick('play')}
+          >
+            <svg className="w-4 h-4 mr-2 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M8 5v14l11-7z"/>
+            </svg>
+            Play from here
+          </div>
         </div>
       )}
     </div>
