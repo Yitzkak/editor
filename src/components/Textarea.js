@@ -9,7 +9,7 @@ const predefinedWords = [
   '[automated voice]', '[video playback]',
   '[background conversation]', '[foreign language]', '[vocalization]'];
 
-const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) => {
+const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onRequestSwapModal }, ref) => {
   const editorRef = useRef(null);
   const quillInstanceRef = useRef(null); // Store Quill instance here
   const [highlightedText, setHighlightedText] = useState('');
@@ -29,7 +29,11 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
     x: 0,
     y: 0,
     timestamp: null,
-    clickIndex: 0
+    clickIndex: 0,
+    selectedText: '',
+    showGoogle: false,
+    showPlay: false,
+    showSwapSpeaker: false,
   });
 
   const contextMenuRef = useRef(null);
@@ -402,7 +406,6 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
 
   // Handle right-clicks on timestamps within the editor
   const handleEditorRightClick = (e) => {
-    console.log('Right-click detected in editor');
     if (!onTimestampClick || !quillInstanceRef.current) return;
     // Get the clicked position
     const range = quillInstanceRef.current.getSelection();
@@ -412,17 +415,31 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
     const textAfter = quillInstanceRef.current.getText(range.index, 30);
     const surroundingText = textBefore + textAfter;
     const timestampMatch = surroundingText.match(/(\d+):(\d+):(\d+\.?\d*)\s+S\d+:/);
-    console.log('surroundingText:', surroundingText);
-    console.log('timestampMatch:', timestampMatch);
-    if (timestampMatch) {
+    // Check for highlighted text
+    let selectedText = '';
+    let showGoogle = false;
+    let showSwapSpeaker = false;
+    if (range.length > 0) {
+      selectedText = quillInstanceRef.current.getText(range.index, range.length).trim();
+      showGoogle = selectedText.length > 0;
+      // Check for speaker labels in selected text
+      const speakerLabels = selectedText.match(/S\d+/g);
+      showSwapSpeaker = speakerLabels && speakerLabels.length > 0;
+    }
+    // Only show menu if timestamp or selection
+    if (timestampMatch || showGoogle || showSwapSpeaker) {
       e.preventDefault();
-      lastMenuOpenTimeRef.current = Date.now(); // Track when menu is opened
+      lastMenuOpenTimeRef.current = Date.now();
       setContextMenu({
         visible: true,
         x: e.clientX,
         y: e.clientY,
-        timestamp: parseInt(timestampMatch[1]) * 3600 + parseInt(timestampMatch[2]) * 60 + parseFloat(timestampMatch[3]),
-        clickIndex: range.index
+        timestamp: timestampMatch ? (parseInt(timestampMatch[1]) * 3600 + parseInt(timestampMatch[2]) * 60 + parseFloat(timestampMatch[3])) : null,
+        clickIndex: range.index,
+        selectedText,
+        showGoogle,
+        showPlay: !!timestampMatch,
+        showSwapSpeaker,
       });
     }
   };
@@ -430,15 +447,16 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
   // Handle context menu item click
   const handleContextMenuClick = (action) => {
     if (action === 'play' && contextMenu.timestamp && onTimestampClick) {
-      // Add visual feedback
       highlightClickedTimestamp(contextMenu.clickIndex);
-      
-      // Call the callback with the timestamp time
       onTimestampClick(contextMenu.timestamp);
+    } else if (action === 'google' && contextMenu.selectedText) {
+      const query = encodeURIComponent(contextMenu.selectedText);
+      window.open(`https://www.google.com/search?q=${query}`, '_blank');
+    } else if (action === 'swapSpeaker' && contextMenu.selectedText && onRequestSwapModal) {
+      onRequestSwapModal(contextMenu.selectedText);
     }
-    
-    // Hide context menu
-    setContextMenu({ visible: false, x: 0, y: 0, timestamp: null, clickIndex: 0 });
+    setSuggestions([]);
+    setContextMenu({ visible: false, x: 0, y: 0, timestamp: null, clickIndex: 0, selectedText: '', showGoogle: false, showPlay: false, showSwapSpeaker: false });
   };
 
   // Handle clicks outside to close suggestions and context menu
@@ -448,7 +466,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
     const menuContains = contextMenuRef.current && contextMenuRef.current.contains(event.target);
     if (!menuContains) {
       setSuggestions([]);
-      setContextMenu({ visible: false, x: 0, y: 0, timestamp: null, clickIndex: 0 });
+      setContextMenu({ visible: false, x: 0, y: 0, timestamp: null, clickIndex: 0, selectedText: '', showGoogle: false, showPlay: false, showSwapSpeaker: false });
     }
   };
 
@@ -728,18 +746,43 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange }, ref) 
           style={{
             top: contextMenu.y,
             left: contextMenu.x,
-            minWidth: '140px'
+            minWidth: '180px'
           }}
         >
-          <div
-            className="px-4 py-2 hover:bg-blue-50 cursor-pointer text-sm font-medium text-gray-700 flex items-center"
-            onClick={() => handleContextMenuClick('play')}
-          >
-            <svg className="w-4 h-4 mr-2 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M8 5v14l11-7z"/>
-            </svg>
-            Play from here
-          </div>
+          {contextMenu.showPlay && (
+            <div
+              className="px-4 py-2 hover:bg-blue-50 cursor-pointer text-sm font-medium text-gray-700 flex items-center"
+              onClick={() => handleContextMenuClick('play')}
+            >
+              <svg className="w-4 h-4 mr-2 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M8 5v14l11-7z"/>
+              </svg>
+              Play from here
+            </div>
+          )}
+          {contextMenu.showGoogle && (
+            <div
+              className="px-4 py-2 hover:bg-green-50 cursor-pointer text-sm font-medium text-gray-700 flex items-center"
+              onClick={() => handleContextMenuClick('google')}
+            >
+              <svg className="w-4 h-4 mr-2 text-green-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M21 21l-4.35-4.35"/>
+              </svg>
+              Search with Google
+            </div>
+          )}
+          {contextMenu.showSwapSpeaker && (
+            <div
+              className="px-4 py-2 hover:bg-purple-50 cursor-pointer text-sm font-medium text-gray-700 flex items-center"
+              onClick={() => handleContextMenuClick('swapSpeaker')}
+            >
+              <svg className="w-4 h-4 mr-2 text-purple-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/>
+              </svg>
+              Swap Speaker Labels
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -4,6 +4,7 @@ import Toolbar from './components/Toolbar';
 import Textarea from './components/Textarea';
 import AudioPlayer from './components/AudioPlayer';
 import FindReplaceModal from './components/FindReplaceModal';
+import SwapSpeakerModal from './components/SwapSpeakerModal';
 
 
 function App() {
@@ -23,6 +24,11 @@ function App() {
   const [audioContext, setAudioContext] = useState(null);
   const [gainNode, setGainNode] = useState(null);
   const [gainValue, setGainValue] = useState(1); // Default gain is 1 (normal volume)
+
+  // Swap Speaker Modal state
+  const [showSwapModal, setShowSwapModal] = useState(false);
+  const [fromLabel, setFromLabel] = useState('S1');
+  const [toLabel, setToLabel] = useState('S2');
 
   const editorRef = useRef(null);
   const audioPlayerRef = useRef(null);
@@ -194,6 +200,22 @@ function App() {
     }
   };
 
+  const handleSwapClick = () => {
+    if (fromLabel && toLabel) {
+      editorRef.current.swapSpeakerLabels(fromLabel, toLabel);
+    }
+  };
+
+  const handleReplaceClick = () => {
+    if (fromLabel && toLabel) {
+      editorRef.current.replaceSpeakerLabel(fromLabel, toLabel);
+    }
+  };
+
+  const handleRequestSwapModal = (selectedText) => {
+    setShowSwapModal(true);
+  };
+
   const handleWaveformClick = (time) => {
     console.log('App.js handleWaveformClick called with time:', time);
     console.log('editorRef.current exists:', !!editorRef.current);
@@ -269,6 +291,15 @@ function App() {
             onSwapSpeakerLabels={handleSwapSpeakerLabels} 
             onIncrease={handleIncrease} 
             onDecrease={handleDecrease}
+            // Modal management props
+            showSwapModal={showSwapModal}
+            setShowSwapModal={setShowSwapModal}
+            fromLabel={fromLabel}
+            toLabel={toLabel}
+            setFromLabel={setFromLabel}
+            setToLabel={setToLabel}
+            handleSwapClick={handleSwapClick}
+            handleReplaceClick={handleReplaceClick}
           />
         </div>
 
@@ -278,7 +309,8 @@ function App() {
             ref={editorRef} 
             fontSize={fontSize} 
             transcript={transcript} 
-            onTranscriptChange={handleTranscriptChange} 
+            onTranscriptChange={handleTranscriptChange}
+            onRequestSwapModal={handleRequestSwapModal}
           />
         </div>
 
@@ -295,6 +327,18 @@ function App() {
           caseSensitive={caseSensitive}
           setCaseSensitive={setCaseSensitive}
         />
+
+        {showSwapModal && (
+          <SwapSpeakerModal
+            onClose={() => setShowSwapModal(false)}
+            handleReplaceClick={handleReplaceClick}
+            handleSwapClick={handleSwapClick}
+            fromLabel={fromLabel}
+            toLabel={toLabel}
+            setFromLabel={setFromLabel}
+            setToLabel={setToLabel}
+          />
+        )}
       </div>
     </div>
   );

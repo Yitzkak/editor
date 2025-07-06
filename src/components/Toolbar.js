@@ -39,29 +39,37 @@ const Toolbar = ({
   onSpeedChange,
   onReplaceSpeakerLabel, 
   onSwapSpeakerLabels,
-  handlePreventBlur
+  handlePreventBlur,
+  // New props for modal management
+  showSwapModal,
+  setShowSwapModal,
+  fromLabel,
+  toLabel,
+  setFromLabel,
+  setToLabel,
+  handleSwapClick,
+  handleReplaceClick
 }) => {
   const fileInputRef = useRef(null);
   const [speedInput, setSpeedInput] = useState(`${speed}%`);
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [showSwapModal, setShowSwapModal] = useState(false);
   const [isAmplifyOpen, setIsAmplifyOpen] = useState(false);
   const [showKeyboardShortcutsModal, setShowKeyboardShortcutsModal] = useState(false);
 
-  const [fromLabel, setFromLabel] = useState('S1');
-  const [toLabel, setToLabel] = useState('S2');
+  // const [fromLabel, setFromLabel] = useState('S1');
+  // const [toLabel, setToLabel] = useState('S2');
 
-  const handleReplaceClick = () => {
-    if (fromLabel && toLabel) {
-      onReplaceSpeakerLabel(fromLabel, toLabel);
-    }
-  };
+  // const handleReplaceClick = () => {
+  //   if (fromLabel && toLabel) {
+  //     onReplaceSpeakerLabel(fromLabel, toLabel);
+  //   }
+  // };
 
-  const handleSwapClick = () => {
-    if (fromLabel && toLabel) {
-      onSwapSpeakerLabels(fromLabel, toLabel);
-    }
-  };
+  // const handleSwapClick = () => {
+  //   if (fromLabel && toLabel) {
+  //     onSwapSpeakerLabels(fromLabel, toLabel);
+  //   }
+  // };
 
   // Handle file selection
   const handleFileChange = (event) => {
@@ -192,7 +200,6 @@ const Toolbar = ({
         />
       </div>
       
-
       {/* Search icon */}
       <button onClick={toggleFindReplace} className="text-gray-600 p-1 hover:text-blue-500" title="Find & Replace">
         <RiFindReplaceLine size={21} />
@@ -263,18 +270,7 @@ const Toolbar = ({
           </div>
         )}
 
-        {/* Swap Speaker Modal */}
-        {showSwapModal && (
-          <SwapSpeakerModal 
-            onClose={() => setShowSwapModal(false)} 
-            fromLabel={fromLabel} 
-            toLabel={toLabel}
-            handleSwapClick={handleSwapClick}
-            handleReplaceClick={handleReplaceClick}
-            setFromLabel={setFromLabel}
-            setToLabel={setToLabel}
-          />  
-        )}
+        
 
         {/* Aplify Volume Modal */}
         {isAmplifyOpen && (
