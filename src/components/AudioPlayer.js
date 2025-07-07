@@ -155,8 +155,10 @@ const AudioPlayer = forwardRef(({ audioFile, volume, amplification = 1, speed, s
   }
 
   const updateAmplification = (factor) => {
+    console.log('updateAmplification called with factor:', factor);
     if (gainNode.current) {
       gainNode.current.gain.value = Math.max(factor, 1);
+      console.log('Amplification set to:', gainNode.current.gain.value);
     }
   };
 

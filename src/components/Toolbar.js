@@ -48,7 +48,11 @@ const Toolbar = ({
   setFromLabel,
   setToLabel,
   handleSwapClick,
-  handleReplaceClick
+  handleReplaceClick,
+  handleAmplifyIncrease,
+  handleAmplifyDecrease,
+  // Add onFixCapitalization to props
+  onFixCapitalization,
 }) => {
   const fileInputRef = useRef(null);
   const [speedInput, setSpeedInput] = useState(`${speed}%`);
@@ -267,6 +271,16 @@ const Toolbar = ({
               <FaRegKeyboard  size={15} className="mr-6 text-gray-600 text-[12px] font-[400]" />
               <span>Keyboard Shortcuts</span> 
             </button>
+            <button
+              onClick={() => {
+                onFixCapitalization();
+                setDropdownOpen(false);
+              }}
+              className="flex items-center w-full px-6 py-4 text-[12px] hover:bg-gray-100"
+            >
+              <span style={{ marginRight: 16, fontWeight: 600, fontSize: 10}}>Aa</span>
+              <span>Fix Capitalization</span>
+            </button>
           </div>
         )}
 
@@ -277,8 +291,9 @@ const Toolbar = ({
         <AmplifyVolumeModal
           isOpen={isAmplifyOpen}
           onClose={() => setIsAmplifyOpen(false)}
-          onIncrease={onIncrease}
-          onDecrease={onDecrease}
+          onIncrease={handleAmplifyIncrease}
+          onDecrease={handleAmplifyDecrease}
+          amplification={amplification}
         />
         )}
 

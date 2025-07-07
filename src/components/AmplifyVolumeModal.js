@@ -1,12 +1,15 @@
 import React, {useState, useEffect } from 'react';
 
-const AmplifyVolumeModal = ({ isOpen, onClose, onIncrease, onDecrease }) => {
+const AmplifyVolumeModal = ({ isOpen, onClose, onIncrease, onDecrease, amplification }) => {
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
       <div className="bg-white p-6 rounded-lg shadow-lg w-80 text-center">
         <h2 className="text-xl font-semibold mb-4">Amplify Audio</h2>
+        <div className="mb-4 text-lg font-medium text-gray-700">
+          Current Amplification: <span className="font-bold">{amplification.toFixed(2)}x</span>
+        </div>
         <div className="flex justify-center gap-4 mb-4">
           <button
             onClick={onDecrease}

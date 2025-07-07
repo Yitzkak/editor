@@ -528,6 +528,11 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     swapSpeakerLabels,
     navigateToTime,
     makeTimestampsClickable,
+    setText: (text) => {
+      if (quillInstanceRef.current) {
+        quillInstanceRef.current.setText(text);
+      }
+    },
   }));
 
   useEffect(() => {

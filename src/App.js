@@ -242,6 +242,35 @@ function App() {
     }
   }, [audioFile]);
 
+  // Amplification controls for modal
+  const handleAmplifyIncrease = () => {
+    setAmplification((prev) => Math.min(prev + 0.5, 5));
+    if (audioPlayerRef.current) {
+      audioPlayerRef.current.updateAmplification(Math.min(amplification + 0.5, 5));
+    }
+  };
+  const handleAmplifyDecrease = () => {
+    setAmplification((prev) => Math.max(prev - 0.5, 1));
+    if (audioPlayerRef.current) {
+      audioPlayerRef.current.updateAmplification(Math.max(amplification - 0.5, 1));
+    }
+  };
+
+  // Fix capitalization handler
+  const handleFixCapitalization = () => {
+    if (!editorRef.current) return;
+    let text = editorRef.current.getText();
+    // Capitalize first letter after . ? ! or at start
+    text = text.replace(/(^|[.!?]\s+)([a-z])/g, (match, p1, p2) => p1 + p2.toUpperCase());
+    // Also capitalize the very first letter if not already
+    text = text.replace(/^([a-z])/, (m, p1) => p1.toUpperCase());
+    setTranscript(text);
+    // Optionally update the editor content directly
+    if (editorRef.current.setText) {
+      editorRef.current.setText(text);
+    }
+  };
+
   return (
     <div className="flex justify-center min-w-96  bg-gray-100 p-[5px] h-screen" >
       <div className="flex flex-col max-h-full items-center w-full max-w-6xl rounded-sm">
@@ -300,6 +329,9 @@ function App() {
             setToLabel={setToLabel}
             handleSwapClick={handleSwapClick}
             handleReplaceClick={handleReplaceClick}
+            handleAmplifyIncrease={handleAmplifyIncrease}
+            handleAmplifyDecrease={handleAmplifyDecrease}
+            onFixCapitalization={handleFixCapitalization}
           />
         </div>
 
