@@ -741,6 +741,17 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
       editorContainer.style.whiteSpace = 'pre-wrap'; // Preserve newlines and wrap text
       editorContainer.style.wordBreak = 'break-word'; // Break long words into the next line
       editorContainer.style.wordSpacing = '5px'; 
+
+      // Hide suggestions on scroll (use suggestionsRef for latest value)
+      const handleScroll = () => {
+        if (suggestionsRef.current.length > 0) {
+          setSuggestions([]);
+        }
+      };
+      editorContainer.addEventListener('scroll', handleScroll);
+      quill.__scrollCleanup = () => {
+        editorContainer.removeEventListener('scroll', handleScroll);
+      };
     }
 
     // Load the saved transcript from localStorage if available
@@ -779,6 +790,8 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
       quill.root.removeEventListener('click', handleEditorClick);
       quill.root.removeEventListener('keydown', handleKeyDown);
       quill.root.removeEventListener('contextmenu', handleEditorRightClick);
+      // Clean up scroll event
+      if (quill.__scrollCleanup) quill.__scrollCleanup();
     };
   }, [fontSize, autosuggestionEnabled]);
 
