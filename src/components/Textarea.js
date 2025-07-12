@@ -216,21 +216,12 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     const displayToOriginal = handleTextChange.displayToOriginal || {};
     const originalWord = displayToOriginal[word] || word;
     const startIndex = cursorIndex - prefix.length;
-    console.log('--- insertSuggestionAtContext DEBUG ---');
-    console.log('Selected suggestion:', word);
-    console.log('Original word to insert:', originalWord);
-    console.log('Stored prefix:', prefix);
-    console.log('Stored cursor index:', cursorIndex);
-    console.log('Start index for deletion:', startIndex);
-    if (prefix.length >= 3) {
+    // Always delete the prefix before the cursor, even if prefix is empty
+    if (prefix.length > 0) {
       quill.deleteText(startIndex, prefix.length);
-      quill.insertText(startIndex, originalWord + ' ');
-      quill.setSelection(startIndex + originalWord.length + 1);
-    } else {
-      quill.insertText(cursorIndex, originalWord + ' ');
-      quill.setSelection(cursorIndex + originalWord.length + 1);
     }
-    console.log('Editor content after insertion:', quill.getText());
+    quill.insertText(startIndex, originalWord + ' ');
+    quill.setSelection(startIndex + originalWord.length + 1);
     setSuggestions([]);
     setCurrentInput('');
     return false;
@@ -665,7 +656,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
         } else if (event.key === 'ArrowUp') {
           event.preventDefault();
           setSelectedSuggestionIndex((prev) => (prev - 1 + suggestionsRef.current.length) % suggestionsRef.current.length);
-        } else if (event.key === 'Tab' || event.key === 'Enter') {
+        } else if (event.key === 'Enter') {
           event.preventDefault();
           event.stopPropagation();
           const suggestion = suggestionsRef.current[selectedSuggestionIndex] || suggestionsRef.current[0];
