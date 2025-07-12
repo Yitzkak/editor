@@ -1,13 +1,26 @@
-import React, { useEffect, useState,useRef, useImperativeHandle, forwardRef } from 'react';
+import React, { useEffect, useState, useRef, useImperativeHandle, forwardRef } from 'react';
 import Quill from 'quill';
 import 'quill/dist/quill.snow.css';
+import Fuse from 'fuse.js';
 
 const predefinedWords = [
   'Objection, form.', 
   'Object to form', 
   '[overlapping conversation]', '[laughter]', '[pause]', '[chuckle]', 
   '[automated voice]', '[video playback]',
-  '[background conversation]', '[foreign language]', '[vocalization]'];
+  '[background conversation]', '[foreign language]', '[vocalization]',
+  // Add more common phrases for contextual suggestions
+  'Let the record reflect',
+  'Off the record',
+  'Back on the record',
+  'I don\'t recall',
+  'I don\'t understand the question',
+  'Can you repeat the question?',
+  'Move to strike',
+  'No further questions',
+  'Redirect examination',
+  'Cross-examination',
+];
 
 const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onRequestSwapModal }, ref) => {
   const editorRef = useRef(null);
@@ -17,6 +30,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
   const [suggestionPosition, setSuggestionPosition] = useState({ top: 0, left: 0 });
 
   const [suggestions, setSuggestions] = useState([]);
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0);
   const [currentInput, setCurrentInput] = useState('');
 
   const suggestionsRef = useRef(suggestions);
@@ -40,6 +54,13 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
 
   const lastMenuOpenTimeRef = useRef(0);
 
+  const inputPrefixRef = useRef('');
+
+  const suggestionContextRef = useRef({ prefix: '', cursorIndex: 0 });
+
+  // Add a ref for the suggestions popup
+  const suggestionsBoxRef = useRef(null);
+
   // Function to capitalize all letters
   const formatUppercase = () => {
     if (!quillInstanceRef.current) return;
@@ -57,20 +78,36 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
   // Function to capitalize the first letter of each word
   const formatTitleCase = () => {
     if (!quillInstanceRef.current) return;
-  
-    const range = quillInstanceRef.current.getSelection();
-    if (range && range.length > 0) {
-      const selectedText = quillInstanceRef.current.getText(range.index, range.length);
-      
-      const transformedText = selectedText
-        .toLowerCase()
-        .split(' ')
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(' ');
-  
-      quillInstanceRef.current.deleteText(range.index, range.length); 
-      quillInstanceRef.current.insertText(range.index, transformedText);
-    }
+
+    // Get the entire transcript text
+    const content = quillInstanceRef.current.getText();
+    console.log('[formatTitleCase] Full content:', content);
+
+    // Split into lines to handle multi-line transcript
+    const lines = content.split(/(\r?\n)/);
+    const transformedLines = lines.map(line => {
+      if (/^\r?\n$/.test(line)) return line;
+      let processed = line;
+      // Capitalize after timestamp+speaker label
+      processed = processed.replace(/((\d{1,2}:){2}\d{1,2}(?:\.\d+)?\s+S\d+:\s*)([a-zA-Z])/, (m, p1, _p2, p3) => {
+        console.log('[formatTitleCase] Speaker label match:', m, '->', p1 + p3.toUpperCase());
+        return p1 + p3.toUpperCase();
+      });
+      // Capitalize after . ? ! (sentence boundaries)
+      processed = processed.replace(/([.!?]\s+)([a-zA-Z])/g, (m, p1, p2) => {
+        console.log('[formatTitleCase] Sentence boundary match:', m, '->', p1 + p2.toUpperCase());
+        return p1 + p2.toUpperCase();
+      });
+      // Capitalize first non-space character of the line
+      processed = processed.replace(/(^\s*[a-zA-Z])/, m => {
+        console.log('[formatTitleCase] Line start match:', m, '->', m.toUpperCase());
+        return m.toUpperCase();
+      });
+      return processed;
+    });
+    const transformedText = transformedLines.join("");
+    console.log('[formatTitleCase] Final transformed text:', transformedText);
+    quillInstanceRef.current.setText(transformedText);
   };
 
   // Function to format spellings
@@ -99,67 +136,89 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
   };
 
   const getWordsFromTranscript = () => {
-    if (!quillInstanceRef.current) return [];
+    if (!quillInstanceRef.current) return { suggestions: [], displayToOriginal: {} };
     const content = quillInstanceRef.current.getText();
-    const words = new Set(content.match(/\b\w+\b/g));
-    return [ ...predefinedWords];
+    // Extract all words (case-insensitive)
+    const wordMatches = content.match(/\b\w+\b/g) || [];
+    const freqMap = {};
+    const originalCaseMap = {};
+    wordMatches.forEach(word => {
+      const lower = word.toLowerCase();
+      freqMap[lower] = (freqMap[lower] || 0) + 1;
+      // Store the first occurrence with original casing
+      if (!originalCaseMap[lower]) originalCaseMap[lower] = word;
+    });
+    // Sort words by frequency, then alphabetically
+    const sortedWords = Object.keys(freqMap)
+      .sort((a, b) => freqMap[b] - freqMap[a] || a.localeCompare(b));
+    // Use original case for display and insertion
+    const displayToOriginal = {};
+    const displayWords = sortedWords.map(w => {
+      displayToOriginal[originalCaseMap[w]] = originalCaseMap[w];
+      return originalCaseMap[w];
+    });
+    // Add predefinedWords (phrases) as-is
+    predefinedWords.forEach(phrase => {
+      displayToOriginal[phrase] = phrase;
+    });
+    const allSuggestions = [...predefinedWords, ...displayWords.filter(w => !predefinedWords.includes(w))];
+    return { suggestions: allSuggestions, displayToOriginal };
   };
 
   const handleTextChange = () => {
     if (!quillInstanceRef.current) return;
-    
     const quill = quillInstanceRef.current;
     const range = quill.getSelection();
     if (!range) return;
-    
-    const textBeforeCursor = quill.getText(0, range.index).trim().split(/\s+/).pop();
-    setCurrentInput(textBeforeCursor);
-    
-    if (textBeforeCursor.length >= 3) {
-      const possibleSuggestions = getWordsFromTranscript().filter(word =>
-        word.toLowerCase().startsWith(textBeforeCursor.toLowerCase())
-      );
+    const textBeforeCursor = quill.getText(0, range.index);
+    const match = textBeforeCursor.match(/[\p{L}\p{N}]+$/u);
+    const prefix = match ? match[0] : '';
+    setCurrentInput(prefix);
+    // Store prefix and cursor index for later use
+    suggestionContextRef.current = { prefix, cursorIndex: range.index };
+    if (prefix.length >= 3) {
+      const { suggestions: allSuggestions, displayToOriginal } = getWordsFromTranscript();
+      const fuse = new Fuse(allSuggestions, {
+        includeScore: true,
+        threshold: 0.4,
+        minMatchCharLength: 2,
+      });
+      const results = fuse.search(prefix);
+      const possibleSuggestions = Array.from(new Set(results.map(r => r.item)));
       setSuggestions(possibleSuggestions);
-  
+      handleTextChange.displayToOriginal = displayToOriginal;
       if (possibleSuggestions.length > 0) {
         const cursorBounds = quill.getBounds(range.index);
         setSuggestionPosition({ top: cursorBounds.top + 30, left: cursorBounds.left });
       }
     } else {
-      setSuggestions([]); // Clear suggestions if less than 3 characters are typed
+      setSuggestions([]);
     }
   };
 
-  const handleSuggestionSelect = (word, offset, event ) => {
+  const insertSuggestionAtContext = (word) => {
     if (!quillInstanceRef.current) return;
-  
     const quill = quillInstanceRef.current;
-    
-    // Ensure editor is focused
     quill.focus();
-  
-    // Get the current selection range again after focusing
-    const range = quill.getSelection();
-    if (!range) return; // Still null? Exit function.
-  
-    // Get the current text before the cursor position
-    const textBeforeCursor = quill.getText(0, range.index);
-    
-    // Extract the last typed word
-    const words = textBeforeCursor.trim().split(/\s+/);
-    const lastWord = words[words.length - 1]; 
-  
-    // Find the start index of the last word
-    const startIndex = range.index - lastWord.length;
-  
-    // Replace the last typed word with the selected suggestion
-    quill.deleteText(startIndex - offset, lastWord.length);
-    quill.insertText(startIndex - offset, word + " ");
-    
-    // Move cursor to the end of inserted word
-    quill.setSelection((startIndex - offset) + word.length + 1 );
-  
-    // Clear suggestions
+    const { prefix, cursorIndex } = suggestionContextRef.current;
+    const displayToOriginal = handleTextChange.displayToOriginal || {};
+    const originalWord = displayToOriginal[word] || word;
+    const startIndex = cursorIndex - prefix.length;
+    console.log('--- insertSuggestionAtContext DEBUG ---');
+    console.log('Selected suggestion:', word);
+    console.log('Original word to insert:', originalWord);
+    console.log('Stored prefix:', prefix);
+    console.log('Stored cursor index:', cursorIndex);
+    console.log('Start index for deletion:', startIndex);
+    if (prefix.length >= 3) {
+      quill.deleteText(startIndex, prefix.length);
+      quill.insertText(startIndex, originalWord + ' ');
+      quill.setSelection(startIndex + originalWord.length + 1);
+    } else {
+      quill.insertText(cursorIndex, originalWord + ' ');
+      quill.setSelection(cursorIndex + originalWord.length + 1);
+    }
+    console.log('Editor content after insertion:', quill.getText());
     setSuggestions([]);
     setCurrentInput('');
     return false;
@@ -517,6 +576,11 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     }
   }, [onTimestampClick]);
 
+  // Reset selected suggestion index when suggestions change
+  useEffect(() => {
+    setSelectedSuggestionIndex(0);
+  }, [suggestions]);
+
   // Expose the `insertTimestamp` method to the parent component
   useImperativeHandle(ref, () => ({
     insertTimestamp,
@@ -533,6 +597,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
         quillInstanceRef.current.setText(text);
       }
     },
+    formatTitleCase, // Expose the function
   }));
 
   useEffect(() => {
@@ -557,7 +622,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
       function () {
         console.log('key binding done');
         if (suggestionsRef.current?.length > 0) {
-          handleSuggestionSelect(suggestionsRef.current[0], 1);
+          insertSuggestionAtContext(suggestionsRef.current[0]);
           return false; // Prevents default Enter behavior
         }
         return true; // Allows Enter if no suggestions
@@ -581,15 +646,18 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     };
 
     const handleKeyDown = (event) => {
-      if (event.key === 'Enter') {
-        if (suggestionsRef?.current.length > 0) {
-          event.preventDefault(); // Prevent default Enter behavior
-          event.stopPropagation(); // Stop event propagation
-          const firstSuggestion = suggestionsRef.current[0]; // Get first suggestion
-
-          const offset = 1;
-          handleSuggestionSelect(firstSuggestion, offset);
-          // return false;
+      if (suggestionsRef.current?.length > 0) {
+        if (event.key === 'ArrowDown') {
+          event.preventDefault();
+          setSelectedSuggestionIndex((prev) => (prev + 1) % suggestionsRef.current.length);
+        } else if (event.key === 'ArrowUp') {
+          event.preventDefault();
+          setSelectedSuggestionIndex((prev) => (prev - 1 + suggestionsRef.current.length) % suggestionsRef.current.length);
+        } else if (event.key === 'Tab' || event.key === 'Enter') {
+          event.preventDefault();
+          event.stopPropagation();
+          const suggestion = suggestionsRef.current[selectedSuggestionIndex] || suggestionsRef.current[0];
+          insertSuggestionAtContext(suggestion);
         }
       }
       else if (event.altKey && event.key === 's') {
@@ -616,15 +684,22 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
       handleTextChange();
       const range = quill.getSelection();
       if (range) {
-        const textBeforeCursor = quill.getText(Math.max(0, range.index - 3), 3).trim();
-        setCurrentInput(textBeforeCursor);
-        
-        if (textBeforeCursor.length >= 3) {
-          const possibleSuggestions = getWordsFromTranscript().filter(word =>
-            word.toLowerCase().startsWith(textBeforeCursor.toLowerCase())
-          );
+        const textBeforeCursor = quill.getText(0, range.index);
+        const prefix = textBeforeCursor.split(/\s+/).pop();
+        setCurrentInput(prefix);
+
+        if (prefix.length >= 3) {
+          const { suggestions: allSuggestions, displayToOriginal } = getWordsFromTranscript();
+          const fuse = new Fuse(allSuggestions, {
+            includeScore: true,
+            threshold: 0.4,
+            minMatchCharLength: 2,
+          });
+          const results = fuse.search(prefix);
+          const possibleSuggestions = Array.from(new Set(results.map(r => r.item)));
           setSuggestions(possibleSuggestions);
-      
+          handleTextChange.displayToOriginal = displayToOriginal;
+
           if (possibleSuggestions.length > 0) {
             const cursorBounds = quill.getBounds(range.index);
             setSuggestionPosition({ top: cursorBounds.top + 30, left: cursorBounds.left });
@@ -696,16 +771,25 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     };
   }, []); // Only on mount
 
-  // Only add the global click/contextmenu handler when the context menu is visible
+  // Only add the global click/contextmenu handler when the suggestions popup or context menu is visible
   useEffect(() => {
-    if (!contextMenu.visible) return;
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("contextmenu", handleClickOutside);
+    if (!contextMenu.visible && suggestions.length === 0) return;
+    function handleGlobalClick(event) {
+      console.log('[Suggestions Popup] Global click handler fired');
+      const menuContains = contextMenuRef.current && contextMenuRef.current.contains(event.target);
+      const suggestionsContains = suggestionsBoxRef.current && suggestionsBoxRef.current.contains(event.target);
+      if (!menuContains && !suggestionsContains) {
+        setSuggestions([]);
+        setContextMenu({ visible: false, x: 0, y: 0, timestamp: null, clickIndex: 0, selectedText: '', showGoogle: false, showPlay: false, showSwapSpeaker: false });
+      }
+    }
+    document.addEventListener("mousedown", handleGlobalClick);
+    document.addEventListener("touchstart", handleGlobalClick);
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("contextmenu", handleClickOutside);
+      document.removeEventListener("mousedown", handleGlobalClick);
+      document.removeEventListener("touchstart", handleGlobalClick);
     };
-  }, [contextMenu.visible]);
+  }, [contextMenu.visible, suggestions.length]);
 
   useEffect(() => {
     const editorContainer = editorRef.current && editorRef.current.querySelector('.ql-editor');
@@ -729,15 +813,26 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
       ></div>
       {suggestions.length > 0 && (
         <div
-          className="absolute bg-white border shadow-lg rounded p-2 text-sm"
-          style={{ top: suggestionPosition.top, left: suggestionPosition.left, position: 'absolute' }}
+          ref={suggestionsBoxRef}
+          className="absolute z-40 bg-white border border-gray-300 shadow-xl rounded-lg p-1 text-xs min-w-[160px] max-w-[260px] transition-all duration-200 ease-out animate-fade-in"
+          style={{
+            top: suggestionPosition.top,
+            left: suggestionPosition.left,
+            position: 'absolute',
+            maxHeight: suggestions.length > 4 ? '168px' : 'auto', // 4 * 42px (item height + margin)
+            overflowY: suggestions.length > 4 ? 'auto' : 'visible',
+            boxShadow: '0 8px 24px rgba(37, 99, 235, 0.08)',
+          }}
         >
           {suggestions.map((word, index) => (
-            <div key={index} 
-            onClick={() => handleSuggestionSelect(word, 0)} 
-            className="cursor-pointer hover:bg-gray-100 p-1 rounded"
+            <div
+              key={index}
+              onClick={() => insertSuggestionAtContext(word)}
+              className={`cursor-pointer px-3 py-2 rounded-md mb-1 last:mb-0 transition-colors duration-150 flex items-center gap-2 select-none whitespace-nowrap ${index === selectedSuggestionIndex ? 'bg-blue-100 font-bold text-blue-700 shadow-sm scale-[1.03]' : 'hover:bg-blue-50'}`}
+              style={index === selectedSuggestionIndex ? { boxShadow: '0 2px 8px rgba(37,99,235,0.10)' } : {}}
             >
-              {word}
+              <svg className="w-3 h-3 text-blue-400 opacity-70" fill="currentColor" viewBox="0 0 20 20"><circle cx="10" cy="10" r="10" /></svg>
+              <span>{word}</span>
             </div>
           ))}
         </div>

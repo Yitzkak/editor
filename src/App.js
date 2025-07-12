@@ -259,15 +259,8 @@ function App() {
   // Fix capitalization handler
   const handleFixCapitalization = () => {
     if (!editorRef.current) return;
-    let text = editorRef.current.getText();
-    // Capitalize first letter after . ? ! or at start
-    text = text.replace(/(^|[.!?]\s+)([a-z])/g, (match, p1, p2) => p1 + p2.toUpperCase());
-    // Also capitalize the very first letter if not already
-    text = text.replace(/^([a-z])/, (m, p1) => p1.toUpperCase());
-    setTranscript(text);
-    // Optionally update the editor content directly
-    if (editorRef.current.setText) {
-      editorRef.current.setText(text);
+    if (editorRef.current.formatTitleCase) {
+      editorRef.current.formatTitleCase();
     }
   };
 
