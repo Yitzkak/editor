@@ -1,5 +1,5 @@
 // Toolbar.js
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import SwapSpeakerModal from "./SwapSpeakerModal";
 import AmplifyVolumeModal from './AmplifyVolumeModal';
 import KeyboardShortcutsModal from './KeyboardShortcutsModal';
@@ -53,12 +53,37 @@ const Toolbar = ({
   handleAmplifyDecrease,
   // Add onFixCapitalization to props
   onFixCapitalization,
+  autosuggestionEnabled,
+  setAutosuggestionEnabled,
 }) => {
   const fileInputRef = useRef(null);
   const [speedInput, setSpeedInput] = useState(`${speed}%`);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [isAmplifyOpen, setIsAmplifyOpen] = useState(false);
   const [showKeyboardShortcutsModal, setShowKeyboardShortcutsModal] = useState(false);
+  const dropdownRef = useRef(null);
+  const moreButtonRef = useRef(null);
+
+  // Click-away handler for dropdown
+  useEffect(() => {
+    if (!dropdownOpen) return;
+    function handleClick(event) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target) &&
+        moreButtonRef.current &&
+        !moreButtonRef.current.contains(event.target)
+      ) {
+        setDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    document.addEventListener('touchstart', handleClick);
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('touchstart', handleClick);
+    };
+  }, [dropdownOpen]);
 
   // const [fromLabel, setFromLabel] = useState('S1');
   // const [toLabel, setToLabel] = useState('S2');
@@ -231,13 +256,13 @@ const Toolbar = ({
       {/* Three-dot menu */}
       <div className="relative">
         {/* More options icon */}
-          <button onClick={() => setDropdownOpen(!dropdownOpen)} className="text-gray-600 p-1 hover:text-blue-500" title="More Options">
+          <button ref={moreButtonRef} onClick={() => setDropdownOpen(!dropdownOpen)} className="text-gray-600 p-1 hover:text-blue-500" title="More Options">
             <FiMoreHorizontal size={21} />
           </button>
 
         {/* Dropdown menu */}
         {dropdownOpen && (
-          <div className="absolute right-0 mt-2 w-56 bg-white border rounded-lg shadow-lg z-50 py-3">
+          <div ref={dropdownRef} className="absolute right-0 mt-2 w-56 bg-white border rounded-lg shadow-lg z-50 py-3">
             {/* Swap Speaker Labels Option */}
             <button
               onClick={() => {
@@ -271,6 +296,19 @@ const Toolbar = ({
               <FaRegKeyboard  size={15} className="mr-6 text-gray-600 text-[12px] font-[400]" />
               <span>Keyboard Shortcuts</span> 
             </button>
+            {/* Autosuggestion toggle */}
+            <div className="flex items-center w-full px-6 py-4 text-[12px] hover:bg-gray-100">
+              <input
+                type="checkbox"
+                checked={autosuggestionEnabled}
+                onChange={e => setAutosuggestionEnabled(e.target.checked)}
+                className="mr-3"
+                id="autosuggestion-toggle"
+              />
+              <label htmlFor="autosuggestion-toggle" className="cursor-pointer">
+                Enable Autosuggestion
+              </label>
+            </div>
             <button
               onClick={() => {
                 onFixCapitalization();

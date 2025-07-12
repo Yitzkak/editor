@@ -22,7 +22,7 @@ const predefinedWords = [
   'Cross-examination',
 ];
 
-const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onRequestSwapModal }, ref) => {
+const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onRequestSwapModal, autosuggestionEnabled }, ref) => {
   const editorRef = useRef(null);
   const quillInstanceRef = useRef(null); // Store Quill instance here
   const [highlightedText, setHighlightedText] = useState('');
@@ -171,13 +171,25 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     const range = quill.getSelection();
     if (!range) return;
     const textBeforeCursor = quill.getText(0, range.index);
-    const match = textBeforeCursor.match(/[\p{L}\p{N}]+$/u);
+    const match = textBeforeCursor.match(/[ 0-\uFFFF\p{L}\p{N}]+$/u);
     const prefix = match ? match[0] : '';
     setCurrentInput(prefix);
-    // Store prefix and cursor index for later use
     suggestionContextRef.current = { prefix, cursorIndex: range.index };
+    let allSuggestions = [];
+    let displayToOriginal = {};
+    if (autosuggestionEnabled) {
+      // Use both predefinedWords and transcript words
+      const result = getWordsFromTranscript();
+      allSuggestions = result.suggestions;
+      displayToOriginal = result.displayToOriginal;
+    } else {
+      // Only use predefinedWords
+      allSuggestions = predefinedWords;
+      predefinedWords.forEach(phrase => {
+        displayToOriginal[phrase] = phrase;
+      });
+    }
     if (prefix.length >= 3) {
-      const { suggestions: allSuggestions, displayToOriginal } = getWordsFromTranscript();
       const fuse = new Fuse(allSuggestions, {
         includeScore: true,
         threshold: 0.4,
@@ -687,9 +699,19 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
         const textBeforeCursor = quill.getText(0, range.index);
         const prefix = textBeforeCursor.split(/\s+/).pop();
         setCurrentInput(prefix);
-
+        let allSuggestions = [];
+        let displayToOriginal = {};
+        if (autosuggestionEnabled) {
+          const result = getWordsFromTranscript();
+          allSuggestions = result.suggestions;
+          displayToOriginal = result.displayToOriginal;
+        } else {
+          allSuggestions = predefinedWords;
+          predefinedWords.forEach(phrase => {
+            displayToOriginal[phrase] = phrase;
+          });
+        }
         if (prefix.length >= 3) {
-          const { suggestions: allSuggestions, displayToOriginal } = getWordsFromTranscript();
           const fuse = new Fuse(allSuggestions, {
             includeScore: true,
             threshold: 0.4,
@@ -699,7 +721,6 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
           const possibleSuggestions = Array.from(new Set(results.map(r => r.item)));
           setSuggestions(possibleSuggestions);
           handleTextChange.displayToOriginal = displayToOriginal;
-
           if (possibleSuggestions.length > 0) {
             const cursorBounds = quill.getBounds(range.index);
             setSuggestionPosition({ top: cursorBounds.top + 30, left: cursorBounds.left });
@@ -759,7 +780,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
       quill.root.removeEventListener('keydown', handleKeyDown);
       quill.root.removeEventListener('contextmenu', handleEditorRightClick);
     };
-  }, [fontSize]);
+  }, [fontSize, autosuggestionEnabled]);
 
   // Attach right-click handler only once on mount
   useEffect(() => {

@@ -20,6 +20,7 @@ function App() {
   const [currentTime, setCurrentTime] = useState(0);
   const [caseSensitive, setCaseSensitive] = useState(false);
   const [audioLoading, setAudioLoading] = useState(false);
+  const [autosuggestionEnabled, setAutosuggestionEnabled] = useState(true);
 
   const [audioContext, setAudioContext] = useState(null);
   const [gainNode, setGainNode] = useState(null);
@@ -325,6 +326,8 @@ function App() {
             handleAmplifyIncrease={handleAmplifyIncrease}
             handleAmplifyDecrease={handleAmplifyDecrease}
             onFixCapitalization={handleFixCapitalization}
+            autosuggestionEnabled={autosuggestionEnabled}
+            setAutosuggestionEnabled={setAutosuggestionEnabled}
           />
         </div>
 
@@ -336,6 +339,7 @@ function App() {
             transcript={transcript} 
             onTranscriptChange={handleTranscriptChange}
             onRequestSwapModal={handleRequestSwapModal}
+            autosuggestionEnabled={autosuggestionEnabled}
           />
         </div>
 
