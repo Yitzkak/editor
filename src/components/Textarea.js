@@ -171,7 +171,8 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     const range = quill.getSelection();
     if (!range) return;
     const textBeforeCursor = quill.getText(0, range.index);
-    const match = textBeforeCursor.match(/[ 0-\uFFFF\p{L}\p{N}]+$/u);
+    // Use word boundary detection to find the current word being typed
+    const match = textBeforeCursor.match(/\b\w*$/);
     const prefix = match ? match[0] : '';
     setCurrentInput(prefix);
     suggestionContextRef.current = { prefix, cursorIndex: range.index };
@@ -688,7 +689,9 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
       const range = quill.getSelection();
       if (range) {
         const textBeforeCursor = quill.getText(0, range.index);
-        const prefix = textBeforeCursor.split(/\s+/).pop();
+        // Use word boundary detection to find the current word being typed
+        const match = textBeforeCursor.match(/\b\w*$/);
+        const prefix = match ? match[0] : '';
         setCurrentInput(prefix);
         let allSuggestions = [];
         let displayToOriginal = {};
