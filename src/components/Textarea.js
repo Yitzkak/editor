@@ -79,10 +79,11 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
   const formatTitleCase = () => {
     if (!quillInstanceRef.current) return;
 
+    // Save the current selection (cursor position)
+    const currentSelection = quillInstanceRef.current.getSelection();
+
     // Get the entire transcript text
     const content = quillInstanceRef.current.getText();
-    console.log('[formatTitleCase] Full content:', content);
-
     // Split into lines to handle multi-line transcript
     const lines = content.split(/(\r?\n)/);
     const transformedLines = lines.map(line => {
@@ -90,24 +91,28 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
       let processed = line;
       // Capitalize after timestamp+speaker label
       processed = processed.replace(/((\d{1,2}:){2}\d{1,2}(?:\.\d+)?\s+S\d+:\s*)([a-zA-Z])/, (m, p1, _p2, p3) => {
-        console.log('[formatTitleCase] Speaker label match:', m, '->', p1 + p3.toUpperCase());
         return p1 + p3.toUpperCase();
       });
       // Capitalize after . ? ! (sentence boundaries)
       processed = processed.replace(/([.!?]\s+)([a-zA-Z])/g, (m, p1, p2) => {
-        console.log('[formatTitleCase] Sentence boundary match:', m, '->', p1 + p2.toUpperCase());
         return p1 + p2.toUpperCase();
       });
       // Capitalize first non-space character of the line
       processed = processed.replace(/(^\s*[a-zA-Z])/, m => {
-        console.log('[formatTitleCase] Line start match:', m, '->', m.toUpperCase());
         return m.toUpperCase();
       });
       return processed;
     });
     const transformedText = transformedLines.join("");
-    console.log('[formatTitleCase] Final transformed text:', transformedText);
     quillInstanceRef.current.setText(transformedText);
+
+    // Restore the previous selection (cursor position)
+    if (currentSelection) {
+      // Clamp the index to the new text length
+      const newLength = quillInstanceRef.current.getLength();
+      const index = Math.min(currentSelection.index, newLength - 1);
+      quillInstanceRef.current.setSelection(index, currentSelection.length || 0);
+    }
   };
 
   // Function to format spellings
@@ -788,6 +793,16 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
       if (quill.__scrollCleanup) quill.__scrollCleanup();
     };
   }, [fontSize, autosuggestionEnabled]);
+
+  // Add this useEffect to auto-run capitalization every 1 minute
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (quillInstanceRef.current) {
+        formatTitleCase();
+      }
+    }, 60000); // 60,000 ms = 1 minute
+    return () => clearInterval(interval);
+  }, []);
 
   // Attach right-click handler only once on mount
   useEffect(() => {
