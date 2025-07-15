@@ -221,10 +221,15 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     const { prefix, cursorIndex } = suggestionContextRef.current;
     const displayToOriginal = handleTextChange.displayToOriginal || {};
     const originalWord = displayToOriginal[word] || word;
-    const startIndex = cursorIndex - prefix.length;
-    // Always delete the prefix before the cursor, even if prefix is empty
-    if (prefix.length > 0) {
-      quill.deleteText(startIndex, prefix.length);
+    let startIndex = cursorIndex - prefix.length;
+    let deleteLength = prefix.length;
+    // If the suggestion starts with [ and the prefix also starts with [, avoid double bracket
+    if (originalWord.startsWith('[') && prefix.startsWith('[')) {
+      startIndex += 1;
+      deleteLength -= 1;
+    }
+    if (deleteLength > 0) {
+      quill.deleteText(startIndex, deleteLength);
     }
     quill.insertText(startIndex, originalWord + ' ');
     quill.setSelection(startIndex + originalWord.length + 1);
