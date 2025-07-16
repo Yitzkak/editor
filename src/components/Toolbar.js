@@ -55,6 +55,7 @@ const Toolbar = ({
   onFixCapitalization,
   autosuggestionEnabled,
   setAutosuggestionEnabled,
+  onFixTranscript,
 }) => {
   const fileInputRef = useRef(null);
   const [speedInput, setSpeedInput] = useState(`${speed}%`);
@@ -318,6 +319,16 @@ const Toolbar = ({
             >
               <span style={{ marginRight: 16, fontWeight: 600, fontSize: 10}}>Aa</span>
               <span>Fix Capitalization</span>
+            </button>
+            <button
+              onClick={() => {
+                onFixTranscript();
+                setDropdownOpen(false);
+              }}
+              className="flex items-center w-full px-6 py-4 text-[12px] hover:bg-gray-100"
+            >
+              <span style={{ marginRight: 16, fontWeight: 600, fontSize: 10}}>&#9998;</span>
+              <span>Fix Transcript</span>
             </button>
           </div>
         )}

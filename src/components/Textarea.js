@@ -612,6 +612,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
       }
     },
     formatTitleCase, // Expose the function
+    fixTranscript,
   }));
 
   useEffect(() => {
@@ -850,6 +851,136 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
 
   // Debug: log contextMenu before return
   console.log('contextMenu state:', contextMenu);
+
+  // Helper: checks if a string ends with sentence-ending punctuation
+  function endsWithPunctuation(str) {
+    return /[.!?…]$/.test(str.trim());
+  }
+
+  // Helper: finds the first sentence-ending punctuation in a string
+  function findFirstSentenceEnd(str) {
+    // Find the first occurrence of ., ?, !, or ...
+    const match = str.match(/([.!?…])([^.!?…]*)/);
+    if (!match) return -1;
+    return match.index + match[0].indexOf(match[1]) + 1;
+  }
+
+  // Helper: extract timestamp+speaker label
+  function extractLabel(line) {
+    // e.g., 0:42:14.0 S1:
+    const match = line.match(/^((\d{1,2}:){2}\d{1,2}(?:\.\d+)?\s+S\d+:\s*)/);
+    if (match) {
+      return { label: match[0], rest: line.slice(match[0].length) };
+    }
+    return { label: '', rest: line };
+  }
+
+  // Helper: checks if a string starts with a timestamp+speaker label
+  function isSpeakerLine(line) {
+    return /^((\d{1,2}:){2}\d{1,2}(?:\.\d+)?\s+S\d+:\s*)/.test(line);
+  }
+
+  // Fix transcript logic
+  const fixTranscript = () => {
+    if (!quillInstanceRef.current) return;
+    const content = quillInstanceRef.current.getText();
+    const lines = content.split(/\r?\n/);
+    const fixedLines = [];
+    let i = 0;
+    while (i < lines.length) {
+      let line = lines[i];
+      if (!line.trim()) {
+        i++;
+        continue;
+      }
+      // If this line is a speaker line
+      if (isSpeakerLine(line)) {
+        // If previous line exists and does not end with punctuation, try to merge
+        if (fixedLines.length > 0 && !endsWithPunctuation(fixedLines[fixedLines.length - 1])) {
+          const { label, rest } = extractLabel(line);
+          const endIdx = findFirstSentenceEnd(rest);
+          if (endIdx !== -1) {
+            let moved = rest.slice(0, endIdx).trim();
+            if (moved.length > 0 && /[A-Z]/.test(moved[0])) {
+              moved = moved[0].toLowerCase() + moved.slice(1);
+            }
+            // Append to previous line (no new line)
+            fixedLines[fixedLines.length - 1] = fixedLines[fixedLines.length - 1].replace(/\s+$/, '') + ' ' + moved.replace(/^\s+/, '');
+            // The rest of the next line (after the punctuation)
+            const restAfter = rest.slice(endIdx).trim();
+            if (restAfter) {
+              fixedLines.push((label + restAfter).trim());
+            }
+            i++;
+            continue;
+          } else {
+            // No punctuation, merge the entire rest into previous line and skip this line
+            let moved = rest.trim();
+            if (moved.length > 0 && /[A-Z]/.test(moved[0])) {
+              moved = moved[0].toLowerCase() + moved.slice(1);
+            }
+            fixedLines[fixedLines.length - 1] = fixedLines[fixedLines.length - 1].replace(/\s+$/, '') + ' ' + moved.replace(/^\s+/, '');
+            i++;
+            continue;
+          }
+        }
+        fixedLines.push(line.trim());
+        i++;
+        continue;
+      }
+      if (endsWithPunctuation(line)) {
+        fixedLines.push(line.trim());
+        i++;
+        continue;
+      }
+      // Otherwise, look ahead to the next line(s)
+      let merged = line;
+      let j = i + 1;
+      while (j < lines.length) {
+        let nextLine = lines[j];
+        if (!nextLine.trim()) {
+          merged += ' ';
+          j++;
+          continue;
+        }
+        if (isSpeakerLine(nextLine)) {
+          break;
+        }
+        const { label, rest } = extractLabel(nextLine);
+        const endIdx = findFirstSentenceEnd(rest);
+        if (endIdx !== -1) {
+          let moved = rest.slice(0, endIdx).trim();
+          if (moved.length > 0 && /[A-Z]/.test(moved[0])) {
+            moved = moved[0].toLowerCase() + moved.slice(1);
+          }
+          merged = merged.replace(/\s+$/, '') + ' ' + moved.replace(/^\s+/, '');
+          fixedLines.push(merged.trim());
+          // The rest of the next line (after the punctuation)
+          const restAfter = rest.slice(endIdx).trim();
+          if (label && (restAfter || restAfter === '')) {
+            fixedLines.push((label + (restAfter ? restAfter : '')).trim());
+          } else if (restAfter) {
+            fixedLines.push(restAfter);
+          }
+          break;
+        } else {
+          merged += ' ' + rest.trim();
+        }
+        j++;
+      }
+      if (j >= lines.length) {
+        fixedLines.push(merged.trim());
+      }
+      i = j + 1;
+    }
+    // Remove trailing blank lines
+    while (fixedLines.length > 0 && fixedLines[fixedLines.length - 1].trim() === '') {
+      fixedLines.pop();
+    }
+    // Join paragraphs with double newline for blank line between paragraphs
+    const fixedText = fixedLines.join('\n\n');
+    quillInstanceRef.current.setText(fixedText);
+  };
 
   return (
     <div className="w-full h-[460px] shadow-lg border relative">

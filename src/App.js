@@ -265,6 +265,13 @@ function App() {
     }
   };
 
+  // Add a handler to trigger fixTranscript on the Textarea ref
+  const handleFixTranscript = () => {
+    if (editorRef.current && editorRef.current.fixTranscript) {
+      editorRef.current.fixTranscript();
+    }
+  };
+
   return (
     <div className="flex justify-center min-w-96  bg-gray-100 p-[5px] h-screen" >
       <div className="flex flex-col max-h-full items-center w-full max-w-6xl rounded-sm">
@@ -326,6 +333,7 @@ function App() {
             handleAmplifyIncrease={handleAmplifyIncrease}
             handleAmplifyDecrease={handleAmplifyDecrease}
             onFixCapitalization={handleFixCapitalization}
+            onFixTranscript={handleFixTranscript}
             autosuggestionEnabled={autosuggestionEnabled}
             setAutosuggestionEnabled={setAutosuggestionEnabled}
           />
