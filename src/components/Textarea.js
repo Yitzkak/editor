@@ -527,6 +527,10 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
       window.open(`https://www.google.com/search?q=${query}`, '_blank');
     } else if (action === 'swapSpeaker' && contextMenu.selectedText && onRequestSwapModal) {
       onRequestSwapModal(contextMenu.selectedText);
+    } else if (action === 'joinParagraphs') {
+      joinParagraphs();
+    } else if (action === 'removeActiveListeningCues') {
+      removeActiveListeningCues();
     }
     setSuggestions([]);
     setContextMenu({ visible: false, x: 0, y: 0, timestamp: null, clickIndex: 0, selectedText: '', showGoogle: false, showPlay: false, showSwapSpeaker: false });
@@ -613,6 +617,8 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     },
     formatTitleCase, // Expose the function
     fixTranscript,
+    joinParagraphs,
+    removeActiveListeningCues,
   }));
 
   useEffect(() => {
@@ -982,6 +988,64 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     quillInstanceRef.current.setText(fixedText);
   };
 
+  // Join only the highlighted text paragraphs, keeping the first timestamp+speaker label
+  const joinParagraphs = () => {
+    if (!quillInstanceRef.current) return;
+    const range = quillInstanceRef.current.getSelection();
+    if (!range || range.length === 0) return;
+    const selectedText = quillInstanceRef.current.getText(range.index, range.length);
+    // Split by double newlines (paragraphs)
+    const paragraphs = selectedText.split(/\r?\n\r?\n/).map(p => p.trim()).filter(Boolean);
+    if (paragraphs.length === 0) return;
+    // Extract the first timestamp+speaker label
+    const firstMatch = paragraphs[0].match(/^((\d{1,2}:){2}\d{1,2}(?:\.\d+)?\s+S\d+:\s*)/);
+    let prefix = '';
+    let firstContent = paragraphs[0];
+    if (firstMatch) {
+      prefix = firstMatch[0];
+      firstContent = paragraphs[0].slice(prefix.length).trim();
+    }
+    // Remove all subsequent timestamps and speaker labels
+    const cleaned = [firstContent, ...paragraphs.slice(1).map(p => p.replace(/^((\d{1,2}:){2}\d{1,2}(?:\.\d+)?\s+S\d+:\s*)/, '').trim())];
+    // Join all cleaned paragraphs with a space
+    const joined = prefix + cleaned.join(' ');
+    // Replace the selected text with the joined result
+    quillInstanceRef.current.deleteText(range.index, range.length);
+    quillInstanceRef.current.insertText(range.index, joined);
+    quillInstanceRef.current.setSelection(range.index + joined.length, 0);
+  };
+
+  // Remove one-word active listening cues after questions in highlighted text
+  const removeActiveListeningCues = () => {
+    if (!quillInstanceRef.current) return;
+    const range = quillInstanceRef.current.getSelection();
+    if (!range || range.length === 0) return;
+    const selectedText = quillInstanceRef.current.getText(range.index, range.length);
+    // List of one-word feedback cues (case-insensitive, with punctuation)
+    const cues = [
+      'yeah.', 'okay.', 'ok.', 'right.', 'yes.', 'no.', 'uh-huh.', 'yep.', 'mm-hmm',
+    ];
+    // Split by double newlines (paragraphs)
+    const paragraphs = selectedText.split(/\r?\n\r?\n/);
+    const cleaned = [];
+    for (let i = 0; i < paragraphs.length; ++i) {
+      const prev = i > 0 ? paragraphs[i-1].trim() : '';
+      const curr = paragraphs[i].trim();
+      // Remove timestamp+speaker label for cue check
+      const cueContent = curr.replace(/^((\d{1,2}:){2}\d{1,2}(?:\.\d+)?\s+S\d+:\s*)/, '').trim();
+      // If previous paragraph does NOT end with ? and this is a one-word cue, skip it
+      if (i > 0 && !/\?$/.test(prev) && cues.includes(cueContent.toLowerCase())) {
+        continue;
+      }
+      cleaned.push(paragraphs[i]);
+    }
+    // Rejoin with double newlines
+    const result = cleaned.join('\n\n');
+    quillInstanceRef.current.deleteText(range.index, range.length);
+    quillInstanceRef.current.insertText(range.index, result);
+    quillInstanceRef.current.setSelection(range.index + result.length, 0);
+  };
+
   return (
     <div className="w-full h-[460px] shadow-lg border relative">
       {/* Quill editor container */}
@@ -1060,6 +1124,29 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
                 <path d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/>
               </svg>
               Swap Speaker Labels
+            </div>
+          )}
+          {contextMenu.selectedText && (
+            <div
+              className="px-4 py-2 hover:bg-yellow-50 cursor-pointer text-sm font-medium text-gray-700 flex items-center"
+              onClick={() => handleContextMenuClick('joinParagraphs')}
+            >
+              <svg className="w-4 h-4 mr-2 text-yellow-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path d="M4 12h16M12 4v16" />
+              </svg>
+              Join Paragraphs
+            </div>
+          )}
+          {contextMenu.selectedText && (
+            <div
+              className="px-4 py-2 hover:bg-red-50 cursor-pointer text-sm font-medium text-gray-700 flex items-center"
+              onClick={() => handleContextMenuClick('removeActiveListeningCues')}
+            >
+              <svg className="w-4 h-4 mr-2 text-red-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M8 12h8M12 8v8" />
+              </svg>
+              Remove Active Listening Cues
             </div>
           )}
         </div>

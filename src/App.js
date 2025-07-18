@@ -272,6 +272,20 @@ function App() {
     }
   };
 
+  // Add a handler to trigger joinParagraphs on the Textarea ref
+  const handleJoinParagraphs = () => {
+    if (editorRef.current && editorRef.current.joinParagraphs) {
+      editorRef.current.joinParagraphs();
+    }
+  };
+
+  // Add a handler to trigger removeActiveListeningCues on the Textarea ref
+  const handleRemoveActiveListeningCues = () => {
+    if (editorRef.current && editorRef.current.removeActiveListeningCues) {
+      editorRef.current.removeActiveListeningCues();
+    }
+  };
+
   return (
     <div className="flex justify-center min-w-96  bg-gray-100 p-[5px] h-screen" >
       <div className="flex flex-col max-h-full items-center w-full max-w-6xl rounded-sm">
@@ -334,6 +348,8 @@ function App() {
             handleAmplifyDecrease={handleAmplifyDecrease}
             onFixCapitalization={handleFixCapitalization}
             onFixTranscript={handleFixTranscript}
+            onJoinParagraphs={handleJoinParagraphs}
+            onRemoveActiveListeningCues={handleRemoveActiveListeningCues}
             autosuggestionEnabled={autosuggestionEnabled}
             setAutosuggestionEnabled={setAutosuggestionEnabled}
           />
