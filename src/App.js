@@ -33,6 +33,7 @@ function App() {
 
   const editorRef = useRef(null);
   const audioPlayerRef = useRef(null);
+  const playRangeTimerRef = useRef(null);
 
   const handleIncrease = () => {
     if (audioPlayerRef.current) {
@@ -236,6 +237,32 @@ function App() {
     }
   };
 
+  // Handle range playback from Textarea speaker snippets
+  const handleRequestPlayRange = (startSeconds, durationSeconds) => {
+    if (!audioPlayerRef.current) return;
+    // Clear any previous stop timer
+    if (playRangeTimerRef.current) {
+      clearTimeout(playRangeTimerRef.current);
+      playRangeTimerRef.current = null;
+    }
+    audioPlayerRef.current.seekTo(startSeconds || 0);
+    audioPlayerRef.current.playAudio();
+    if (typeof durationSeconds === 'number' && durationSeconds > 0) {
+      playRangeTimerRef.current = setTimeout(() => {
+        audioPlayerRef.current?.pauseAudio();
+        playRangeTimerRef.current = null;
+      }, Math.round(durationSeconds * 1000));
+    }
+  };
+
+  const handleRequestStop = () => {
+    if (playRangeTimerRef.current) {
+      clearTimeout(playRangeTimerRef.current);
+      playRangeTimerRef.current = null;
+    }
+    audioPlayerRef.current?.pauseAudio();
+  };
+
   // Enable bidirectional navigation when audio is loaded
   useEffect(() => {
     if (editorRef.current && audioFile) {
@@ -364,6 +391,8 @@ function App() {
             onTranscriptChange={handleTranscriptChange}
             onRequestSwapModal={handleRequestSwapModal}
             autosuggestionEnabled={autosuggestionEnabled}
+            onRequestPlayRange={handleRequestPlayRange}
+            onRequestStop={handleRequestStop}
           />
         </div>
 

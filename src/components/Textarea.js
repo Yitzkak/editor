@@ -22,7 +22,7 @@ const predefinedWords = [
   'Cross-examination',
 ];
 
-const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onRequestSwapModal, autosuggestionEnabled }, ref) => {
+const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onRequestSwapModal, autosuggestionEnabled, onRequestPlayRange, onRequestStop }, ref) => {
   const editorRef = useRef(null);
   const quillInstanceRef = useRef(null); // Store Quill instance here
   const [highlightedText, setHighlightedText] = useState('');
@@ -69,6 +69,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     showGoogle: false,
     showPlay: false,
     showSwapSpeaker: false,
+    showSpeakerSnippets: false,
   });
 
   const contextMenuRef = useRef(null);
@@ -81,6 +82,28 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
 
   // Add a ref for the suggestions popup
   const suggestionsBoxRef = useRef(null);
+
+  // Speaker snippets state
+  const [showSpeakerSnippets, setShowSpeakerSnippets] = useState(false);
+  const [speakerSnippets, setSpeakerSnippets] = useState({}); // { S1: [{start,end,index}], ... }
+  const [speakerOrder, setSpeakerOrder] = useState([]); // ["S1","S2",...]
+  const [snippetCount, setSnippetCount] = useState(() => {
+    try {
+      const val = parseInt(localStorage.getItem('snippet_count'), 10);
+      return Number.isFinite(val) && val > 0 ? val : 3;
+    } catch (e) {
+      return 3;
+    }
+  });
+  const [snippetDuration, setSnippetDuration] = useState(() => {
+    try {
+      const val = parseFloat(localStorage.getItem('snippet_duration'), 10);
+      return Number.isFinite(val) && val > 0 ? val : 3;
+    } catch (e) {
+      return 3;
+    }
+  });
+  const [detectedSpeakerCount, setDetectedSpeakerCount] = useState(0);
 
   // Function to capitalize all letters
   const formatUppercase = () => {
@@ -134,6 +157,18 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
       const index = Math.min(currentSelection.index, newLength - 1);
       quillInstanceRef.current.setSelection(index, currentSelection.length || 0);
     }
+  };
+
+  // Function to capitalize first letter of each word in current selection
+  const formatSelectionTitleCase = () => {
+    if (!quillInstanceRef.current) return;
+    const range = quillInstanceRef.current.getSelection();
+    if (!range || range.length === 0) return;
+    const selectedText = quillInstanceRef.current.getText(range.index, range.length);
+    const transformedText = selectedText.replace(/\b([a-zA-Z])/g, (m, p1) => p1.toUpperCase());
+    quillInstanceRef.current.deleteText(range.index, range.length);
+    quillInstanceRef.current.insertText(range.index, transformedText);
+    quillInstanceRef.current.setSelection(range.index, transformedText.length);
   };
 
   // Function to format spellings
@@ -523,7 +558,9 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
       showSwapSpeaker = speakerLabels && speakerLabels.length > 0;
     }
     // Only show menu if timestamp or selection
-    if (timestampMatch || showGoogle || showSwapSpeaker) {
+    // Always show speaker snippets option in context menu if there are any speakers
+    const showSpeakerSnips = detectedSpeakerCount > 0;
+    if (timestampMatch || showGoogle || showSwapSpeaker || showSpeakerSnips) {
       e.preventDefault();
       lastMenuOpenTimeRef.current = Date.now();
       setContextMenu({
@@ -536,6 +573,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
         showGoogle,
         showPlay: !!timestampMatch,
         showSwapSpeaker,
+        showSpeakerSnippets: showSpeakerSnips,
       });
     }
   };
@@ -550,6 +588,11 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
       window.open(`https://www.google.com/search?q=${query}`, '_blank');
     } else if (action === 'swapSpeaker' && contextMenu.selectedText && onRequestSwapModal) {
       onRequestSwapModal(contextMenu.selectedText);
+    } else if (action === 'speakerSnippets') {
+      const { snippets, order } = buildSpeakerSnippets();
+      setSpeakerSnippets(snippets);
+      setSpeakerOrder(order);
+      setShowSpeakerSnippets(true);
     } else if (action === 'joinParagraphs') {
       joinParagraphs();
     } else if (action === 'removeActiveListeningCues') {
@@ -607,6 +650,17 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
       const content = quillInstanceRef.current.getText();
       const index = createTimestampIndex(content);
       setTimestampIndex(index);
+      // Update speaker count snapshot
+      const speakerMatches = content.match(/\bS\d+:/g) || [];
+      const speakerSet = new Set(speakerMatches.map(s => s.replace(/:$/, '')));
+      const count = speakerSet.size;
+      console.log('Speaker detection:', { 
+        matches: speakerMatches, 
+        unique: Array.from(speakerSet), 
+        count,
+        contentLength: content.length 
+      });
+      setDetectedSpeakerCount(count);
     }
   }, [transcript]); // Only depend on transcript changes
 
@@ -768,7 +822,11 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
       }
       else if (event.ctrlKey && event.key === 'g') {
         event.preventDefault();
-        formatTitleCase(); // Function to capitalize first letter of each word
+        // Only title-case when there is a non-empty selection
+        const sel = quill.getSelection();
+        if (sel && sel.length > 0) {
+          formatSelectionTitleCase();
+        }
       }
     };
 
@@ -1122,6 +1180,80 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     quillInstanceRef.current.setSelection(range.index + result.length, 0);
   };
 
+  // Build speaker snippets from paragraphs
+  const buildSpeakerSnippets = () => {
+    if (!quillInstanceRef.current) return { snippets: {}, order: [] };
+    const content = quillInstanceRef.current.getText();
+    const paragraphs = content.split(/\r?\n\r?\n/);
+    const items = []; // {speaker, start, end, index}
+    for (let i = 0; i < paragraphs.length; i++) {
+      const p = paragraphs[i];
+      const match = p.match(/^((\d{1,2}:){2}\d{1,2}(?:\.\d+)?)[\s]+(S\d+):\s*/);
+      if (!match) continue;
+      const startStr = match[1];
+      const speakerId = match[3];
+      const toSeconds = (ts) => {
+        const [hh, mm, ss] = ts.split(':');
+        return parseInt(hh) * 3600 + parseInt(mm) * 60 + parseFloat(ss);
+      };
+      const start = toSeconds(startStr);
+      // Find end time from next paragraph with timestamp
+      let end = null;
+      for (let j = i + 1; j < paragraphs.length; j++) {
+        const n = paragraphs[j];
+        const m2 = n.match(/^((\d{1,2}:){2}\d{1,2}(?:\.\d+)?)[\s]+S\d+:\s*/);
+        if (m2) {
+          end = toSeconds(m2[1]);
+          break;
+        }
+      }
+      items.push({ speaker: speakerId, start, end, index: i });
+    }
+    // Group by speaker
+    const bySpeaker = {};
+    items.forEach(it => {
+      if (!bySpeaker[it.speaker]) bySpeaker[it.speaker] = [];
+      bySpeaker[it.speaker].push(it);
+    });
+    // Sort each speaker's items by start time
+    Object.keys(bySpeaker).forEach(k => bySpeaker[k].sort((a,b) => a.start - b.start));
+    // Pick up to snippetCount evenly spaced
+    const pickEven = (arr, k) => {
+      if (arr.length <= k) return arr;
+      const result = [];
+      const step = (arr.length - 1) / (k - 1);
+      for (let i = 0; i < k; i++) {
+        const idx = Math.round(i * step);
+        result.push(arr[idx]);
+      }
+      // de-duplicate in case rounding collided
+      const seen = new Set();
+      return result.filter(it => {
+        const key = it.index;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    };
+    const snippets = {};
+    const order = Object.keys(bySpeaker).sort();
+    order.forEach(sp => {
+      snippets[sp] = pickEven(bySpeaker[sp], snippetCount);
+    });
+    return { snippets, order };
+  };
+
+  const formatTime = (seconds) => {
+    if (seconds == null) return '';
+    const sign = seconds < 0 ? '-' : '';
+    const s = Math.max(0, Math.abs(seconds));
+    const hh = Math.floor(s / 3600);
+    const mm = Math.floor((s % 3600) / 60);
+    const ss = (s % 60).toFixed(1);
+    const pad = (n) => (n < 10 ? '0' + n : '' + n);
+    return `${sign}${hh}:${pad(mm)}:${ss.padStart(4,'0')}`;
+  };
+
   return (
     <div className="w-full h-[460px] shadow-lg border relative">
       {/* Toggle Notes button */}
@@ -1135,6 +1267,28 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
       >
         {showNotes ? 'Hide Notes' : 'Notes'}
       </button>
+      {/* Toggle Speaker Snippets button - always show if there are speakers */}
+      {detectedSpeakerCount > 0 && (
+        <button
+          type="button"
+          onClick={() => {
+            const { snippets, order } = buildSpeakerSnippets();
+            setSpeakerSnippets(snippets);
+            setSpeakerOrder(order);
+            setShowSpeakerSnippets(v => !v);
+          }}
+          className={`absolute top-2 right-20 z-50 text-white text-xs font-semibold px-3 py-1 rounded shadow ${
+            detectedSpeakerCount >= 3 
+              ? 'bg-indigo-600 hover:bg-indigo-700' 
+              : 'bg-gray-500 hover:bg-gray-600'
+          }`}
+          aria-pressed={showSpeakerSnippets}
+          aria-label="Toggle speaker snippets"
+          title={showSpeakerSnippets ? 'Hide Speaker Snippets' : `Show Speaker Snippets (${detectedSpeakerCount} speakers)`}
+        >
+          {showSpeakerSnippets ? 'Hide Snippets' : 'Snippets'}
+        </button>
+      )}
       {/* Editor + Notes layout */}
       <div className="flex h-full">
         {/* Quill editor container */}
@@ -1143,6 +1297,86 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
           className="flex-1 font-monox bg-white rounded-md h-full break-words word-space-2 whitespace-pre-wrap"
           title="Right-click on timestamps (like '0:00:36.4 S2:') to play audio from that point"
         ></div>
+        {/* Speaker snippets panel (conditionally shown) */}
+        {showSpeakerSnippets && (
+          <div className="w-80 h-full border-l bg-white">
+            <div className="h-full flex flex-col">
+              <div className="px-3 pt-3 pb-1 text-xs font-semibold text-gray-700 flex items-center justify-between">
+                <span>Speaker Snippets</span>
+                <div className="flex items-center gap-2 text-[11px]">
+                  <label className="flex items-center gap-1 text-gray-500">
+                    <span>Count</span>
+                    <select
+                      className="border rounded px-1 py-[1px]"
+                      value={snippetCount}
+                      onChange={(e) => {
+                        const v = parseInt(e.target.value, 10);
+                        setSnippetCount(v);
+                        localStorage.setItem('snippet_count', String(v));
+                        const { snippets, order } = buildSpeakerSnippets();
+                        setSpeakerSnippets(snippets);
+                        setSpeakerOrder(order);
+                      }}
+                    >
+                      <option value={1}>1</option>
+                      <option value={3}>3</option>
+                      <option value={5}>5</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+              <div className="flex-1 overflow-auto p-2 space-y-3">
+                {speakerOrder.length === 0 && (
+                  <div className="text-xs text-gray-500 px-2">No timestamped speakers detected.</div>
+                )}
+                {speakerOrder.map(sp => (
+                  <div key={sp} className="border rounded-md">
+                    <div className="px-2 py-1 text-xs font-semibold bg-gray-50 border-b">{sp}</div>
+                    <div className="p-2 flex flex-wrap gap-2">
+                      {(speakerSnippets[sp] || []).map((snip, idx) => (
+                        <button
+                          key={idx}
+                          className="text-[11px] px-2 py-1 rounded border hover:bg-indigo-50 text-indigo-700 border-indigo-200"
+                          title={`Play from ${formatTime(snip.start)}${snip.end != null ? ` to ${formatTime(snip.end)}` : ''}`}
+                          onClick={() => {
+                            if (onRequestPlayRange) {
+                              const dur = (snip.end != null && snip.end > snip.start) ? (snip.end - snip.start) : undefined;
+                              onRequestPlayRange(snip.start, dur);
+                            } else if (onTimestampClick) {
+                              onTimestampClick(snip.start);
+                            }
+                          }}
+                        >
+                          {formatTime(snip.start)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="p-2 border-t">
+                <button
+                  className="text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200"
+                  onClick={() => {
+                    const { snippets, order } = buildSpeakerSnippets();
+                    setSpeakerSnippets(snippets);
+                    setSpeakerOrder(order);
+                  }}
+                >
+                  Rebuild
+                </button>
+                {onRequestStop && (
+                  <button
+                    className="ml-2 text-xs px-2 py-1 rounded bg-red-100 hover:bg-red-200 text-red-700"
+                    onClick={() => onRequestStop()}
+                  >
+                    Stop
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
         {showNotes && (
           <>
             {/* Resize handle */}
@@ -1252,6 +1486,18 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
                 <path d="M4 12h16M12 4v16" />
               </svg>
               Join Paragraphs
+            </div>
+          )}
+          {contextMenu.showSpeakerSnippets && (
+            <div
+              className="px-4 py-2 hover:bg-indigo-50 cursor-pointer text-sm font-medium text-gray-700 flex items-center"
+              onClick={() => handleContextMenuClick('speakerSnippets')}
+            >
+              <svg className="w-4 h-4 mr-2 text-indigo-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path d="M9 19V6l12-2v13" />
+                <rect x="3" y="10" width="4" height="10" rx="1" />
+              </svg>
+              Speaker Snippets
             </div>
           )}
           {contextMenu.selectedText && (
