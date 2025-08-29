@@ -33,6 +33,27 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0);
   const [currentInput, setCurrentInput] = useState('');
 
+  // Notes panel state
+  const [showNotes, setShowNotes] = useState(false);
+  const [notes, setNotes] = useState(() => {
+    try {
+      return localStorage.getItem('transcript_notes') || '';
+    } catch (e) {
+      return '';
+    }
+  });
+  const [notesWidth, setNotesWidth] = useState(() => {
+    try {
+      const saved = parseInt(localStorage.getItem('transcript_notes_width'), 10);
+      return Number.isFinite(saved) && saved > 0 ? saved : 320; // default 320px
+    } catch (e) {
+      return 320;
+    }
+  });
+  const isResizingRef = useRef(false);
+  const startXRef = useRef(0);
+  const startWidthRef = useRef(320);
+
   const suggestionsRef = useRef(suggestions);
   const [timestampIndex, setTimestampIndex] = useState([]);
   const [onTimestampClick, setOnTimestampClick] = useState(null);
@@ -201,8 +222,10 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
         threshold: 0.4,
         minMatchCharLength: 2,
       });
-      const results = fuse.search(prefix);
-      const possibleSuggestions = Array.from(new Set(results.map(r => r.item)));
+      let results = fuse.search(prefix);
+      let possibleSuggestions = Array.from(new Set(results.map(r => r.item)));
+      // Filter out the current prefix from suggestions (case-insensitive)
+      possibleSuggestions = possibleSuggestions.filter(s => s.toLowerCase() !== prefix.toLowerCase());
       setSuggestions(possibleSuggestions);
       handleTextChange.displayToOriginal = displayToOriginal;
       if (possibleSuggestions.length > 0) {
@@ -599,6 +622,18 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     setSelectedSuggestionIndex(0);
   }, [suggestions]);
 
+  // Update suggestionContextRef when selectedSuggestionIndex changes
+  useEffect(() => {
+    if (!quillInstanceRef.current) return;
+    const quill = quillInstanceRef.current;
+    const range = quill.getSelection();
+    if (!range) return;
+    const textBeforeCursor = quill.getText(0, range.index);
+    const match = textBeforeCursor.match(/\b\w*$/);
+    const prefix = match ? match[0] : '';
+    suggestionContextRef.current = { prefix, cursorIndex: range.index };
+  }, [selectedSuggestionIndex]);
+
   // Expose the `insertTimestamp` method to the parent component
   useImperativeHandle(ref, () => ({
     insertTimestamp,
@@ -625,6 +660,46 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     suggestionsRef.current = suggestions;
   }, [suggestions]);
 
+  // Persist notes
+  useEffect(() => {
+    try {
+      localStorage.setItem('transcript_notes', notes);
+    } catch (e) {
+      // ignore storage errors
+    }
+  }, [notes]);
+
+  // Persist notes width when it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('transcript_notes_width', String(notesWidth));
+    } catch (e) {
+      // ignore
+    }
+  }, [notesWidth]);
+
+  // Handle drag to resize notes panel
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (!isResizingRef.current) return;
+      const delta = startXRef.current - e.clientX;
+      const next = Math.max(220, Math.min(700, startWidthRef.current + delta));
+      setNotesWidth(next);
+    };
+    const handleMouseUp = () => {
+      if (!isResizingRef.current) return;
+      isResizingRef.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
+
   useEffect(() => {
     if (!editorRef.current) return; // Exit if editorRef is not ready
 
@@ -638,17 +713,18 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
       placeholder: 'Start typing your transcription here...',
     });
 
-    quill.keyboard.addBinding(
-      { key: 13 }, // Enter key
-      function () {
-        console.log('key binding done');
-        if (suggestionsRef.current?.length > 0) {
-          insertSuggestionAtContext(suggestionsRef.current[0]);
-          return false; // Prevents default Enter behavior
-        }
-        return true; // Allows Enter if no suggestions
-      }
-    );
+    // Remove the Quill keyboard binding for Enter (key: 13)
+    // quill.keyboard.addBinding(
+    //   { key: 13 }, // Enter key
+    //   function () {
+    //     console.log('key binding done');
+    //     if (suggestionsRef.current?.length > 0) {
+    //       insertSuggestionAtContext(suggestionsRef.current[0]);
+    //       return false; // Prevents default Enter behavior
+    //     }
+    //     return true; // Allows Enter if no suggestions
+    //   }
+    // );
 
     // Assign the Quill instance to the ref
     quillInstanceRef.current = quill;
@@ -1023,7 +1099,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     const selectedText = quillInstanceRef.current.getText(range.index, range.length);
     // List of one-word feedback cues (case-insensitive, with punctuation)
     const cues = [
-      'yeah.', 'okay.', 'ok.', 'right.', 'yes.', 'no.', 'uh-huh.', 'yep.', 'mm-hmm',
+      'yeah.', 'okay.', 'ok.', 'right.', 'yes.', 'no.', 'uh-huh.', 'yep.', 'mm-hmm.',
     ];
     // Split by double newlines (paragraphs)
     const paragraphs = selectedText.split(/\r?\n\r?\n/);
@@ -1048,12 +1124,53 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
 
   return (
     <div className="w-full h-[460px] shadow-lg border relative">
-      {/* Quill editor container */}
-      <div
-        ref={editorRef}
-        className="font-monox bg-white rounded-md h-full break-words word-space-2 whitespace-pre-wrap"
-        title="Right-click on timestamps (like '0:00:36.4 S2:') to play audio from that point"
-      ></div>
+      {/* Toggle Notes button */}
+      <button
+        type="button"
+        onClick={() => setShowNotes(v => !v)}
+        className="absolute top-2 right-2 z-50 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-1 rounded shadow"
+        aria-pressed={showNotes}
+        aria-label="Toggle notes panel"
+        title={showNotes ? 'Hide Notes' : 'Show Notes'}
+      >
+        {showNotes ? 'Hide Notes' : 'Notes'}
+      </button>
+      {/* Editor + Notes layout */}
+      <div className="flex h-full">
+        {/* Quill editor container */}
+        <div
+          ref={editorRef}
+          className="flex-1 font-monox bg-white rounded-md h-full break-words word-space-2 whitespace-pre-wrap"
+          title="Right-click on timestamps (like '0:00:36.4 S2:') to play audio from that point"
+        ></div>
+        {showNotes && (
+          <>
+            {/* Resize handle */}
+            <div
+              onMouseDown={(e) => {
+                isResizingRef.current = true;
+                startXRef.current = e.clientX;
+                startWidthRef.current = notesWidth;
+                document.body.style.cursor = 'col-resize';
+                document.body.style.userSelect = 'none';
+              }}
+              className="w-1 cursor-col-resize bg-transparent hover:bg-blue-200"
+              title="Drag to resize notes"
+            />
+            <div className="h-full border-l bg-gray-50" style={{ width: notesWidth }}>
+            <div className="h-full flex flex-col">
+              <div className="px-3 pt-3 pb-1 text-xs font-semibold text-gray-600">Notes</div>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Type your notes here..."
+                className="flex-1 w-full p-3 bg-transparent outline-none resize-none text-sm"
+              />
+            </div>
+            </div>
+          </>
+        )}
+      </div>
       {suggestions.length > 0 && (
         <div
           ref={suggestionsBoxRef}
