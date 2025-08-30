@@ -104,6 +104,17 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     }
   });
   const [detectedSpeakerCount, setDetectedSpeakerCount] = useState(0);
+  const [snippetsWidth, setSnippetsWidth] = useState(() => {
+    try {
+      const saved = parseInt(localStorage.getItem('transcript_snippets_width'), 10);
+      return Number.isFinite(saved) && saved > 0 ? saved : 320; // default 320px
+    } catch (e) {
+      return 320;
+    }
+  });
+  const isResizingSnippetsRef = useRef(false);
+  const startXSnippetsRef = useRef(0);
+  const startWidthSnippetsRef = useRef(320);
 
   // Function to capitalize all letters
   const formatUppercase = () => {
@@ -708,6 +719,17 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     fixTranscript,
     joinParagraphs,
     removeActiveListeningCues,
+    // Expose trigger functions and state
+    toggleSpeakerSnippets: () => {
+      const { snippets, order } = buildSpeakerSnippets();
+      setSpeakerSnippets(snippets);
+      setSpeakerOrder(order);
+      setShowSpeakerSnippets(v => !v);
+    },
+    toggleNotes: () => setShowNotes(v => !v),
+    showSpeakerSnippets,
+    showNotes,
+    detectedSpeakerCount,
   }));
 
   useEffect(() => {
@@ -732,6 +754,15 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     }
   }, [notesWidth]);
 
+  // Persist snippets width when it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('transcript_snippets_width', String(snippetsWidth));
+    } catch (e) {
+      // ignore
+    }
+  }, [snippetsWidth]);
+
   // Handle drag to resize notes panel
   useEffect(() => {
     const handleMouseMove = (e) => {
@@ -743,6 +774,28 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     const handleMouseUp = () => {
       if (!isResizingRef.current) return;
       isResizingRef.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
+
+  // Handle drag to resize snippets panel
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (!isResizingSnippetsRef.current) return;
+      const delta = startXSnippetsRef.current - e.clientX;
+      const next = Math.max(220, Math.min(700, startWidthSnippetsRef.current + delta));
+      setSnippetsWidth(next);
+    };
+    const handleMouseUp = () => {
+      if (!isResizingSnippetsRef.current) return;
+      isResizingSnippetsRef.current = false;
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
     };
@@ -1256,53 +1309,6 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
 
   return (
     <div className="w-full h-[460px] shadow-lg border relative">
-      {/* Stacked square triggers positioned outside the text area */}
-      <div className="absolute -top-2 -right-2 z-50 flex flex-col gap-1">
-        {/* Audio Snippets trigger - always visible */}
-        <button
-          type="button"
-          onClick={() => {
-            const { snippets, order } = buildSpeakerSnippets();
-            setSpeakerSnippets(snippets);
-            setSpeakerOrder(order);
-            setShowSpeakerSnippets(v => !v);
-          }}
-          className={`w-8 h-8 flex items-center justify-center text-white text-xs font-semibold shadow-lg border-2 border-white rounded-sm ${
-            showSpeakerSnippets 
-              ? 'bg-indigo-600 hover:bg-indigo-700' 
-              : 'bg-indigo-500 hover:bg-indigo-600'
-          }`}
-          aria-pressed={showSpeakerSnippets}
-          aria-label="Toggle speaker snippets"
-          title={showSpeakerSnippets ? 'Hide Speaker Snippets' : `Show Speaker Snippets (${detectedSpeakerCount} speakers)`}
-        >
-          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M9 19V6l12-2v13"/>
-            <rect x="3" y="10" width="4" height="10" rx="1"/>
-          </svg>
-        </button>
-        {/* Notes trigger */}
-        <button
-          type="button"
-          onClick={() => setShowNotes(v => !v)}
-          className={`w-8 h-8 flex items-center justify-center text-white text-xs font-semibold shadow-lg border-2 border-white rounded-sm ${
-            showNotes 
-              ? 'bg-blue-600 hover:bg-blue-700' 
-              : 'bg-blue-500 hover:bg-blue-600'
-          }`}
-          aria-pressed={showNotes}
-          aria-label="Toggle notes panel"
-          title={showNotes ? 'Hide Notes' : 'Show Notes'}
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-            <polyline points="14,2 14,8 20,8"/>
-            <line x1="16" y1="13" x2="8" y2="13"/>
-            <line x1="16" y1="17" x2="8" y2="17"/>
-            <polyline points="10,9 9,9 8,9"/>
-          </svg>
-        </button>
-      </div>
       {/* Editor + Notes layout */}
       <div className="flex h-full">
         {/* Quill editor container */}
@@ -1313,7 +1319,20 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
         ></div>
         {/* Speaker snippets panel (conditionally shown) */}
         {showSpeakerSnippets && (
-          <div className="w-80 h-full border-l bg-white">
+          <>
+            {/* Resize handle for snippets */}
+            <div
+              onMouseDown={(e) => {
+                isResizingSnippetsRef.current = true;
+                startXSnippetsRef.current = e.clientX;
+                startWidthSnippetsRef.current = snippetsWidth;
+                document.body.style.cursor = 'col-resize';
+                document.body.style.userSelect = 'none';
+              }}
+              className="w-1 cursor-col-resize bg-transparent hover:bg-indigo-200"
+              title="Drag to resize snippets"
+            />
+            <div className="h-full border-l bg-white" style={{ width: snippetsWidth }}>
             <div className="h-full flex flex-col">
               <div className="px-3 pt-3 pb-1 text-xs font-semibold text-gray-700 flex items-center justify-between">
                 <span>Speaker Snippets</span>
@@ -1390,6 +1409,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
               </div>
             </div>
           </div>
+          </>
         )}
         {showNotes && (
           <>

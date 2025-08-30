@@ -243,14 +243,14 @@ const Toolbar = ({
       </button>
 
       {/* Upload icon (triggers file input) */}
-      <button onClick={handleUploadClick} className="text-gray-600 p-1 hover:text-blue-500" title="Upload an audio file">
+      <button onClick={handleUploadClick} className="text-gray-600 p-1 hover:text-blue-500" title="Upload an audio or video file">
         <RiFileUploadLine size={21} />
       </button>
       
-      {/* Hidden file input for audio upload */}
+      {/* Hidden file input for audio/video upload */}
       <input
         type="file"
-        accept="audio/*"
+        accept="audio/*,video/*"
         ref={fileInputRef}
         onChange={handleFileChange}
         style={{ display: 'none' }}
