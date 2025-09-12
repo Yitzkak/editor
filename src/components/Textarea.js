@@ -84,6 +84,15 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
   const suggestionsBoxRef = useRef(null);
 
   // Speaker snippets state
+  // Speaker names mapping: { S1: "Name", S2: "Name2", ... }
+  const [speakerNames, setSpeakerNames] = useState(() => {
+    try {
+      const saved = localStorage.getItem('speaker_names');
+      return saved ? JSON.parse(saved) : {};
+    } catch (e) {
+      return {};
+    }
+  });
   const [showSpeakerSnippets, setShowSpeakerSnippets] = useState(false);
   const [speakerSnippets, setSpeakerSnippets] = useState({}); // { S1: [{start,end,index}], ... }
   const [speakerOrder, setSpeakerOrder] = useState([]); // ["S1","S2",...]
@@ -755,6 +764,14 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
   }, [notesWidth]);
 
   // Persist snippets width when it changes
+  // Persist speaker names when they change
+  useEffect(() => {
+    try {
+      localStorage.setItem('speaker_names', JSON.stringify(speakerNames));
+    } catch (e) {
+      // ignore
+    }
+  }, [speakerNames]);
   useEffect(() => {
     try {
       localStorage.setItem('transcript_snippets_width', String(snippetsWidth));
@@ -1364,7 +1381,20 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
                 )}
                 {speakerOrder.map(sp => (
                   <div key={sp} className="border rounded-md">
-                    <div className="px-2 py-1 text-xs font-semibold bg-gray-50 border-b">{sp}</div>
+                    <div className="px-2 py-1 text-xs font-semibold bg-gray-50 border-b flex items-center gap-2">
+                      <span>{sp}:</span>
+                      <input
+                        type="text"
+                        className="border rounded px-1 py-[1px] text-xs w-24"
+                        value={speakerNames[sp] || ''}
+                        onChange={e => {
+                          setSpeakerNames(prev => ({ ...prev, [sp]: e.target.value }));
+                        }}
+                        placeholder="Name"
+                        title="Enter speaker name"
+                      />
+                      <span className="text-gray-400">- audio snippets</span>
+                    </div>
                     <div className="p-2 flex flex-wrap gap-2">
                       {(speakerSnippets[sp] || []).map((snip, idx) => (
                         <button
