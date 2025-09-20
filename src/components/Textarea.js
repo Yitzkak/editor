@@ -1564,6 +1564,59 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
               Speaker Snippets
             </div>
           )}
+          {contextMenu.selectedText && contextMenu.selectedText.match(/^((\d{1,2}:){2}\d{1,2}(?:\.\d+)?)[\s]+S\d+:/) && (
+            <div
+              className="px-4 py-2 hover:bg-indigo-100 cursor-pointer text-sm font-medium text-indigo-700 flex items-center"
+              onClick={() => {
+                // Add to Speaker Snippets logic
+                const match = contextMenu.selectedText.match(/^((\d{1,2}:){2}\d{1,2}(?:\.\d+)?)[\s]+(S\d+):/);
+                if (match) {
+                  const startStr = match[1];
+                  const speakerId = match[3];
+                  const toSeconds = (ts) => {
+                    const [hh, mm, ss] = ts.split(':');
+                    return parseInt(hh) * 3600 + parseInt(mm) * 60 + parseFloat(ss);
+                  };
+                  const start = toSeconds(startStr);
+
+                  // Find end time from next timestamp in transcript
+                  const content = quillInstanceRef.current.getText();
+                  const paragraphs = content.split(/\r?\n\r?\n/);
+                  let end = null;
+                  let foundIdx = -1;
+                  for (let i = 0; i < paragraphs.length; i++) {
+                    if (paragraphs[i].includes(contextMenu.selectedText.trim())) {
+                      foundIdx = i;
+                      break;
+                    }
+                  }
+                  if (foundIdx !== -1) {
+                    for (let j = foundIdx + 1; j < paragraphs.length; j++) {
+                      const m2 = paragraphs[j].match(/^((\d{1,2}:){2}\d{1,2}(?:\.\d+)?)[\s]+S\d+:/);
+                      if (m2) {
+                        end = toSeconds(m2[1]);
+                        break;
+                      }
+                    }
+                  }
+
+                  // Add to speakerSnippets state
+                  setSpeakerSnippets(prev => {
+                    const arr = prev[speakerId] ? [...prev[speakerId]] : [];
+                    arr.push({ speaker: speakerId, start, end, index: foundIdx });
+                    return { ...prev, [speakerId]: arr };
+                  });
+                  if (!speakerOrder.includes(speakerId)) setSpeakerOrder(order => [...order, speakerId]);
+                }
+                setContextMenu({ ...contextMenu, visible: false });
+              }}
+            >
+              <svg className="w-4 h-4 mr-2 text-indigo-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path d="M12 4v16m8-8H4" />
+              </svg>
+              Add to Speaker Snippets
+            </div>
+          )}
           {contextMenu.selectedText && (
             <div
               className="px-4 py-2 hover:bg-red-50 cursor-pointer text-sm font-medium text-gray-700 flex items-center"
