@@ -1436,6 +1436,18 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
                     Stop
                   </button>
                 )}
+                {/* Always show Clear button */}
+                <button
+                  className="ml-2 text-xs px-2 py-1 rounded bg-yellow-100 hover:bg-yellow-200 text-yellow-700"
+                  onClick={() => {
+                    if (window.confirm("Are you sure you want to clear all speaker snippets? This cannot be undone.")) {
+                      setSpeakerSnippets({});
+                      setSpeakerOrder([]);
+                    }
+                  }}
+                >
+                  Clear
+                </button>
               </div>
             </div>
           </div>
@@ -1592,7 +1604,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
                   }
                   if (foundIdx !== -1) {
                     for (let j = foundIdx + 1; j < paragraphs.length; j++) {
-                      const m2 = paragraphs[j].match(/^((\d{1,2}:){2}\d{1,2}(?:\.\d+)?)[\s]+S\d+:/);
+                      const m2 = paragraphs[j].match(/^((\d{1,2}:){2}\d{1,2}(?:\.\d+)?)[\s]+S\d+:\s*/);
                       if (m2) {
                         end = toSeconds(m2[1]);
                         break;
