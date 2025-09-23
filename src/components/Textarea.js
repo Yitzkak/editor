@@ -125,6 +125,15 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
   const startXSnippetsRef = useRef(0);
   const startWidthSnippetsRef = useRef(320);
 
+  // Add this state for speaker characteristics
+  const [speakerCharacteristics, setSpeakerCharacteristics] = useState({}); // { S1: ["deep voice", ...], ... }
+
+  // Find & Replace state
+  const [showFindReplace, setShowFindReplace] = useState(false);
+  const [findText, setFindText] = useState('');
+  const [replaceTextValue, setReplaceTextValue] = useState('');
+  const [findResultCount, setFindResultCount] = useState(0);
+
   // Function to capitalize all letters
   const formatUppercase = () => {
     if (!quillInstanceRef.current) return;
@@ -1383,6 +1392,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
                   <div key={sp} className="border rounded-md">
                     <div className="px-2 py-1 text-xs font-semibold bg-gray-50 border-b flex items-center gap-2">
                       <span>{sp}:</span>
+                      {/* Input for name */}
                       <input
                         type="text"
                         className="border rounded px-1 py-[1px] text-xs w-24"
@@ -1392,26 +1402,99 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
                         }}
                         placeholder="Name"
                         title="Enter speaker name"
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            // Focus characteristics input if exists
+                            document.getElementById(`char-input-${sp}`)?.focus();
+                          }
+                        }}
                       />
-                      <span className="text-gray-400">- audio snippets</span>
+                      {/* Input for adding characteristics */}
+                      <input
+                        id={`char-input-${sp}`}
+                        type="text"
+                        className="border rounded px-1 py-[1px] text-xs w-32"
+                        placeholder="Add characteristic"
+                        onKeyDown={e => {
+                          if (e.key === 'Enter' && e.target.value.trim()) {
+                            setSpeakerCharacteristics(prev => ({
+                              ...prev,
+                              [sp]: [...(prev[sp] || []), e.target.value.trim()]
+                            }));
+                            e.target.value = '';
+                          }
+                        }}
+                      />
+                      <button
+                        className="ml-1 px-2 py-1 text-xs rounded bg-indigo-100 hover:bg-indigo-200 text-indigo-700"
+                        onClick={e => {
+                          const input = document.getElementById(`char-input-${sp}`);
+                          if (input && input.value.trim()) {
+                            setSpeakerCharacteristics(prev => ({
+                              ...prev,
+                              [sp]: [...(prev[sp] || []), input.value.trim()]
+                            }));
+                            input.value = '';
+                          }
+                        }}
+                      >
+                        Add
+                      </button>
                     </div>
+                    {/* Characteristics list */}
+                    {(speakerCharacteristics[sp] || []).length > 0 && (
+                      <div className="px-2 pb-1 flex flex-wrap gap-2">
+                        {speakerCharacteristics[sp].map((char, idx) => (
+                          <span key={idx} className="inline-flex items-center bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs">
+                            {char}
+                            <button
+                              className="ml-1 text-xs text-red-500 hover:text-red-700"
+                              title="Delete characteristic"
+                              onClick={() => {
+                                setSpeakerCharacteristics(prev => ({
+                                  ...prev,
+                                  [sp]: prev[sp].filter((_, i) => i !== idx)
+                                }));
+                              }}
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
                     <div className="p-2 flex flex-wrap gap-2">
                       {(speakerSnippets[sp] || []).map((snip, idx) => (
-                        <button
-                          key={idx}
-                          className="text-[11px] px-2 py-1 rounded border hover:bg-indigo-50 text-indigo-700 border-indigo-200"
-                          title={`Play from ${formatTime(snip.start)}${snip.end != null ? ` to ${formatTime(snip.end)}` : ''}`}
-                          onClick={() => {
-                            if (onRequestPlayRange) {
-                              const dur = (snip.end != null && snip.end > snip.start) ? (snip.end - snip.start) : undefined;
-                              onRequestPlayRange(snip.start, dur);
-                            } else if (onTimestampClick) {
-                              onTimestampClick(snip.start);
-                            }
-                          }}
-                        >
-                          {formatTime(snip.start)}
-                        </button>
+                        <div key={idx} className="flex items-center gap-1">
+                          <button
+                            className="text-[11px] px-2 py-1 rounded border hover:bg-indigo-50 text-indigo-700 border-indigo-200"
+                            title={`Play from ${formatTime(snip.start)}${snip.end != null ? ` to ${formatTime(snip.end)}` : ''}`}
+                            onClick={() => {
+                              if (onRequestPlayRange) {
+                                const dur = (snip.end != null && snip.end > snip.start) ? (snip.end - snip.start) : undefined;
+                                onRequestPlayRange(snip.start, dur);
+                              } else if (onTimestampClick) {
+                                onTimestampClick(snip.start);
+                              }
+                            }}
+                          >
+                            {formatTime(snip.start)}
+                          </button>
+                          {/* Delete individual snippet button */}
+                          <button
+                            className="text-[10px] px-1 py-1 rounded bg-red-100 hover:bg-red-200 text-red-700"
+                            title="Delete this snippet"
+                            onClick={() => {
+                              setSpeakerSnippets(prev => ({
+                                ...prev,
+                                [sp]: prev[sp].filter((_, i) => i !== idx)
+                              }));
+                            }}
+                          >
+                            ×
+                          </button>
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -1643,6 +1726,117 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
           )}
         </div>
       )}
+
+      {/* Find & Replace panel */}
+      {showFindReplace && (
+        <div className="h-full border-l bg-white" style={{ width: 320 }}>
+          <div className="h-full flex flex-col">
+            <div className="px-3 pt-3 pb-1 text-xs font-semibold text-gray-700 flex items-center justify-between">
+              <span>Find & Replace</span>
+            </div>
+            <div className="flex-1 overflow-auto p-3 space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Find</label>
+                <input
+                  type="text"
+                  className="w-full border rounded px-2 py-1 text-xs"
+                  value={findText}
+                  onChange={e => setFindText(e.target.value)}
+                  placeholder="Enter text to find"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Replace</label>
+                <input
+                  type="text"
+                  className="w-full border rounded px-2 py-1 text-xs"
+                  value={replaceTextValue}
+                  onChange={e => setReplaceTextValue(e.target.value)}
+                  placeholder="Enter replacement text"
+                />
+              </div>
+              <div className="flex gap-2 mt-2">
+                <button
+                  className="px-3 py-1 rounded bg-indigo-500 text-white text-xs font-semibold"
+                  onClick={() => {
+                    if (!findText) return;
+                    // Count matches
+                    const content = quillInstanceRef.current?.getText() || '';
+                    const regex = new RegExp(findText, 'gi');
+                    const matches = content.match(regex);
+                    setFindResultCount(matches ? matches.length : 0);
+                    // Highlight first match
+                    if (matches && matches.length > 0) {
+                      const idx = content.toLowerCase().indexOf(findText.toLowerCase());
+                      if (idx !== -1) {
+                        quillInstanceRef.current.setSelection(idx, findText.length);
+                        quillInstanceRef.current.formatText(idx, findText.length, { background: '#fde68a' });
+                      }
+                    }
+                  }}
+                >
+                  Find
+                </button>
+                <button
+                  className="px-3 py-1 rounded bg-green-500 text-white text-xs font-semibold"
+                  onClick={() => {
+                    if (!findText) return;
+                    // Replace all
+                    const content = quillInstanceRef.current?.getText() || '';
+                    const regex = new RegExp(findText, 'gi');
+                    const newContent = content.replace(regex, replaceTextValue);
+                    quillInstanceRef.current?.setText(newContent);
+                    setFindResultCount(0);
+                  }}
+                >
+                  Replace All
+                </button>
+              </div>
+              {findResultCount > 0 && (
+                <div className="mt-2 text-xs text-gray-500">
+                  {findResultCount} match{findResultCount > 1 ? 'es' : ''} found.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      
+      <div className="absolute top-2 right-2 flex flex-col gap-2 z-50">
+        {/* Speaker snippets toggle */}
+        <button
+          className={`mb-2 w-8 h-8 flex items-center justify-center rounded-lg shadow transition-colors ${showSpeakerSnippets ? 'bg-indigo-500 text-white' : 'bg-white text-indigo-500 hover:bg-indigo-100'}`}
+          title="Speaker Snippets"
+          onClick={() => setShowSpeakerSnippets(v => !v)}
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <path d="M3 7v14l9-7z"/>
+          </svg>
+        </button>
+        {/* Notes toggle */}
+        <button
+          className={`mb-2 w-8 h-8 flex items-center justify-center rounded-lg shadow transition-colors ${showNotes ? 'bg-indigo-500 text-white' : 'bg-white text-indigo-500 hover:bg-indigo-100'}`}
+          title="Notes"
+          onClick={() => setShowNotes(v => !v)}
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <path d="M7 8h10M7 12h10m-5 4h5"/>
+          </svg>
+        </button>
+        {/* Find & Replace toggle */}
+        <button
+          className={`mb-2 w-8 h-8 flex items-center justify-center rounded-lg shadow transition-colors ${showFindReplace ? 'bg-indigo-500 text-white' : 'bg-white text-indigo-500 hover:bg-indigo-100'}`}
+          title="Find & Replace"
+          onClick={() => setShowFindReplace(v => !v)}
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            <line x1="11" y1="7" x2="11" y2="15" />
+            <line x1="7" y1="11" x2="15" y2="11" />
+          </svg>
+        </button>
+      </div>
     </div>
   );
 });
