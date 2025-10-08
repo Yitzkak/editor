@@ -348,16 +348,24 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     }
   };
 
-  const findAndHighlight = (text, caseSensitive = false) => {
+  const findAndHighlight = (text, caseSensitive = false, wholeWord = false) => {
     if (!quillInstanceRef.current) return;
     const content = quillInstanceRef.current.getText();
     const flags = caseSensitive ? '' : 'i';
-    const regex = new RegExp(text, flags);
+    let pattern = text;
+    
+    if (wholeWord) {
+      // Escape special regex characters and wrap with word boundaries
+      const escapedText = text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      pattern = `\\b${escapedText}\\b`;
+    }
+    
+    const regex = new RegExp(pattern, flags);
     const match = content.match(regex);
     if (match) {
       const index = match.index;
-      quillInstanceRef.current.setSelection(index, text.length);
-      quillInstanceRef.current.formatText(index, text.length, { background: 'yellow' });
+      quillInstanceRef.current.setSelection(index, match[0].length);
+      quillInstanceRef.current.formatText(index, match[0].length, { background: 'yellow' });
     } else {
       alert('Text not found.');
     }
@@ -367,16 +375,22 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
-  const replaceText = (findText, replaceText, caseSensitive = false) => {
+  const replaceText = (findText, replaceText, caseSensitive = false, wholeWord = false) => {
     if (!quillInstanceRef.current) return;
     const escapedFindText = escapeRegExp(findText);
     const flags = caseSensitive ? '' : 'i';
-    const regex = new RegExp(escapedFindText, flags);
+    let pattern = escapedFindText;
+    
+    if (wholeWord) {
+      pattern = `\\b${escapedFindText}\\b`;
+    }
+    
+    const regex = new RegExp(pattern, flags);
     const content = quillInstanceRef.current.getText();
     const match = content.match(regex);
     if (match) {
       const index = match.index;
-      quillInstanceRef.current.deleteText(index, findText.length);
+      quillInstanceRef.current.deleteText(index, match[0].length);
       quillInstanceRef.current.insertText(index, replaceText);
     } else {
       alert('Text not found.');
@@ -388,11 +402,17 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     return quillInstanceRef.current.getText();
   };
 
-  const replaceAll = (findText, replaceText, caseSensitive = false) => {
+  const replaceAll = (findText, replaceText, caseSensitive = false, wholeWord = false) => {
     if (!quillInstanceRef.current) return;
     const escapedFindText = escapeRegExp(findText);
     const flags = 'g' + (caseSensitive ? '' : 'i');
-    const regex = new RegExp(escapedFindText, flags);
+    let pattern = escapedFindText;
+    
+    if (wholeWord) {
+      pattern = `\\b${escapedFindText}\\b`;
+    }
+    
+    const regex = new RegExp(pattern, flags);
     const content = quillInstanceRef.current.getText();
     const newContent = content.replace(regex, replaceText);
     quillInstanceRef.current.setText(newContent);
@@ -1073,12 +1093,21 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
 
   // Helper: checks if a string ends with sentence-ending punctuation
   function endsWithPunctuation(str) {
-    return /[.!?…]$/.test(str.trim());
+    const trimmed = str.trim();
+    // Check for three dots first, then single punctuation marks
+    return /\.{3}$/.test(trimmed) || /[.!?…]$/.test(trimmed);
   }
 
   // Helper: finds the first sentence-ending punctuation in a string
   function findFirstSentenceEnd(str) {
-    // Find the first occurrence of ., ?, !, or ...
+    // Find the first occurrence of ., ?, !, ..., or ellipsis character
+    // Prioritize three dots (...) over single dots
+    const ellipsisMatch = str.match(/(\.{3})([^.!?…]*)/);
+    if (ellipsisMatch) {
+      return ellipsisMatch.index + ellipsisMatch[1].length;
+    }
+    
+    // Then look for single punctuation marks
     const match = str.match(/([.!?…])([^.!?…]*)/);
     if (!match) return -1;
     return match.index + match[0].indexOf(match[1]) + 1;

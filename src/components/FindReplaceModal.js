@@ -12,6 +12,8 @@ const FindReplaceModal = ({
   handleReplaceAll,
   caseSensitive,
   setCaseSensitive,
+  wholeWord,
+  setWholeWord,
 }) => {
   const modalRef = useRef(null);
   const headerRef = useRef(null);
@@ -101,6 +103,16 @@ const FindReplaceModal = ({
             className="mr-2"
           />
           <label htmlFor="caseSensitiveCheckbox" className="text-sm">Case sensitive</label>
+        </div>
+        <div className="mb-4 flex items-center">
+          <input
+            id="wholeWordCheckbox"
+            type="checkbox"
+            checked={wholeWord}
+            onChange={e => setWholeWord(e.target.checked)}
+            className="mr-2"
+          />
+          <label htmlFor="wholeWordCheckbox" className="text-sm">Whole word</label>
         </div>
         <div className="flex justify-between">
           <button

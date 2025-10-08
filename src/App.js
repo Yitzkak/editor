@@ -19,6 +19,7 @@ function App() {
   const [playbackSpeed, setPlaybackSpeed] = useState(1.0); // Default 100%
   const [currentTime, setCurrentTime] = useState(0);
   const [caseSensitive, setCaseSensitive] = useState(false);
+  const [wholeWord, setWholeWord] = useState(true);
   const [audioLoading, setAudioLoading] = useState(false);
   const [autosuggestionEnabled, setAutosuggestionEnabled] = useState(true);
   const [performanceMode, setPerformanceMode] = useState(false); // Hide waveform for >3h files
@@ -155,19 +156,19 @@ function App() {
 
   const handleFind = () => {
     if (editorRef.current && findText) {
-      editorRef.current.findAndHighlight(findText, caseSensitive);
+      editorRef.current.findAndHighlight(findText, caseSensitive, wholeWord);
     }
   };
   
   const handleReplace = () => {
     if (editorRef.current && findText && replaceText) {
-      editorRef.current.replaceText(findText, replaceText, caseSensitive);
+      editorRef.current.replaceText(findText, replaceText, caseSensitive, wholeWord);
     }
   };
   
   const handleReplaceAll = () => {
     if (editorRef.current && findText && replaceText) {
-      editorRef.current.replaceAll(findText, replaceText, caseSensitive);
+      editorRef.current.replaceAll(findText, replaceText, caseSensitive, wholeWord);
     }
   };
 
@@ -487,6 +488,8 @@ function App() {
           handleReplaceAll={handleReplaceAll}
           caseSensitive={caseSensitive}
           setCaseSensitive={setCaseSensitive}
+          wholeWord={wholeWord}
+          setWholeWord={setWholeWord}
         />
 
         {showSwapModal && (
