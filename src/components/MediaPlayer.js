@@ -2,11 +2,16 @@ import React, { useEffect, useRef, forwardRef, useImperativeHandle, useState } f
 import WaveSurfer from 'wavesurfer.js';
 import "../App.css";
 
-const MediaPlayer = forwardRef(({ mediaFile, volume, amplification = 1, speed, setAudioLoading, onWaveformClick }, ref) => {
+const MediaPlayer = forwardRef(({ mediaFile, volume, amplification = 1, speed, performanceMode = false, setAudioLoading, onWaveformClick }, ref) => {
   const waveformRef = useRef(null);
   const videoRef = useRef(null);
+  const longAudioRef = useRef(null);
+  const longAudioUrlRef = useRef(null);
   const wavesurfer = useRef(null);
   const gainNode = useRef(null);
+  const [isLongAudioReady, setIsLongAudioReady] = useState(false);
+  const wrapperRef = useRef(null);
+  const [placeholderBarCount, setPlaceholderBarCount] = useState(120);
   const [isVideo, setIsVideo] = useState(false);
   const [videoUrl, setVideoUrl] = useState(null);
   
@@ -205,6 +210,7 @@ const MediaPlayer = forwardRef(({ mediaFile, volume, amplification = 1, speed, s
     if (mediaFile) {
       const isVideoFile = checkIfVideo(mediaFile);
       setIsVideo(isVideoFile);
+      console.log('[MediaPlayer] mediaFile set. isVideo:', isVideoFile, 'performanceMode:', performanceMode);
       
       if (isVideoFile) {
         // For video files, create a URL for the video element
@@ -224,17 +230,58 @@ const MediaPlayer = forwardRef(({ mediaFile, volume, amplification = 1, speed, s
           });
         }
       } else {
-        // For audio files, use WaveSurfer as before
-        if (waveformRef.current && !wavesurfer.current) {
-          initializeWaveSurfer();
-        }
-        if (wavesurfer.current) {
-          const fileUrl = URL.createObjectURL(mediaFile);
-          wavesurfer.current.load(fileUrl);
+        // Audio file
+        const fileUrl = URL.createObjectURL(mediaFile);
+        if (performanceMode) {
+          // Use hidden HTMLAudioElement for long files; show loading until metadata ready
+          console.log('[MediaPlayer] Performance mode: setting audio src and showing loader');
           if (setAudioLoading) setAudioLoading(true);
-          wavesurfer.current.once('ready', () => {
-            if (setAudioLoading) setAudioLoading(false);
-          });
+          setIsLongAudioReady(false);
+          if (longAudioRef.current) {
+            // cleanup old URL if any
+            if (longAudioUrlRef.current) {
+              try { URL.revokeObjectURL(longAudioUrlRef.current); } catch (e) {}
+            }
+            longAudioUrlRef.current = fileUrl;
+            longAudioRef.current.src = fileUrl;
+            const loadStart = Date.now();
+            const hideLoader = () => {
+              const elapsed = Date.now() - loadStart;
+              const remaining = Math.max(0, 500 - elapsed); // ensure min 500ms to avoid flicker
+              setTimeout(() => {
+                if (setAudioLoading) setAudioLoading(false);
+              }, remaining);
+            };
+            const onCanPlayThrough = () => {
+              console.log('[MediaPlayer] long audio canplaythrough. duration:', longAudioRef.current?.duration);
+              hideLoader();
+              setIsLongAudioReady(true);
+              longAudioRef.current?.removeEventListener('canplaythrough', onCanPlayThrough);
+              longAudioRef.current?.removeEventListener('error', onError);
+            };
+            const onError = (e) => {
+              console.error('[MediaPlayer] long audio error', e);
+              if (setAudioLoading) setAudioLoading(false);
+              setIsLongAudioReady(false);
+              longAudioRef.current?.removeEventListener('canplaythrough', onCanPlayThrough);
+              longAudioRef.current?.removeEventListener('error', onError);
+            };
+            longAudioRef.current.addEventListener('canplaythrough', onCanPlayThrough);
+            longAudioRef.current.addEventListener('error', onError);
+          }
+        } else {
+          if (waveformRef.current && !wavesurfer.current) {
+            initializeWaveSurfer();
+          }
+          if (wavesurfer.current) {
+            wavesurfer.current.load(fileUrl);
+            console.log('[MediaPlayer] WaveSurfer loading start');
+            if (setAudioLoading) setAudioLoading(true);
+            wavesurfer.current.once('ready', () => {
+              console.log('[MediaPlayer] WaveSurfer ready');
+              if (setAudioLoading) setAudioLoading(false);
+            });
+          }
         }
       }
     }
@@ -242,6 +289,10 @@ const MediaPlayer = forwardRef(({ mediaFile, volume, amplification = 1, speed, s
     return () => {
       if (videoUrl) {
         URL.revokeObjectURL(videoUrl);
+      }
+      if (longAudioUrlRef.current) {
+        try { URL.revokeObjectURL(longAudioUrlRef.current); } catch (e) {}
+        longAudioUrlRef.current = null;
       }
     };
   }, [mediaFile]);
@@ -319,6 +370,10 @@ const MediaPlayer = forwardRef(({ mediaFile, volume, amplification = 1, speed, s
     if (videoRef.current && isVideo) {
       videoRef.current.playbackRate = speed;
     }
+    if (longAudioRef.current && !isVideo && performanceMode) {
+      console.log('[MediaPlayer] set long audio playbackRate:', speed);
+      longAudioRef.current.playbackRate = speed;
+    }
   }, [speed, isVideo]);
 
   useEffect(() => {
@@ -328,7 +383,27 @@ const MediaPlayer = forwardRef(({ mediaFile, volume, amplification = 1, speed, s
     if (videoRef.current && isVideo) {
       videoRef.current.volume = volume;
     }
+    if (longAudioRef.current && !isVideo && performanceMode) {
+      console.log('[MediaPlayer] set long audio volume:', volume);
+      longAudioRef.current.volume = volume;
+    }
   }, [volume, isVideo]);
+
+  // Compute placeholder bar count to fill the available width
+  useEffect(() => {
+    const computeBarCount = () => {
+      const width = wrapperRef.current?.clientWidth || 0;
+      const barWidth = 2; // px
+      const gap = 2; // px
+      const padding = 16; // px (px-2 left+right in placeholder container)
+      const effectiveWidth = Math.max(0, width - padding);
+      const count = Math.max(60, Math.min(400, Math.floor(effectiveWidth / (barWidth + gap))));
+      setPlaceholderBarCount(count || 60);
+    };
+    computeBarCount();
+    window.addEventListener('resize', computeBarCount);
+    return () => window.removeEventListener('resize', computeBarCount);
+  }, []);
 
   function formatTime(seconds) {
     const h = Math.floor(seconds / 3600);
@@ -368,6 +443,16 @@ const MediaPlayer = forwardRef(({ mediaFile, volume, amplification = 1, speed, s
           seekVideo(newTime);
           playVideo();
         }
+      } else if (performanceMode && longAudioRef.current) {
+        const a = longAudioRef.current;
+        if (!a.paused) {
+          a.pause();
+        } else {
+          const currentTime = a.currentTime || 0;
+          const newTime = Math.max(currentTime - 3, 0);
+          a.currentTime = newTime;
+          a.play();
+        }
       } else if (wavesurfer.current) {
         if (wavesurfer.current.isPlaying()) {
           wavesurfer.current.pause();
@@ -387,6 +472,11 @@ const MediaPlayer = forwardRef(({ mediaFile, volume, amplification = 1, speed, s
         const duration = getVideoDuration();
         const newPosition = Math.min(currentPosition + seconds, duration);
         seekVideo(newPosition);
+      } else if (performanceMode && longAudioRef.current) {
+        const a = longAudioRef.current;
+        const duration = a.duration || 0;
+        const newPosition = Math.min((a.currentTime || 0) + seconds, duration);
+        a.currentTime = newPosition;
       } else if (wavesurfer.current) {
         const currentPosition = wavesurfer.current.getCurrentTime();
         const duration = wavesurfer.current.getDuration();
@@ -399,6 +489,10 @@ const MediaPlayer = forwardRef(({ mediaFile, volume, amplification = 1, speed, s
         const currentPosition = getVideoCurrentTime();
         const newPosition = Math.max(currentPosition - seconds, 0);
         seekVideo(newPosition);
+      } else if (performanceMode && longAudioRef.current) {
+        const a = longAudioRef.current;
+        const newPosition = Math.max((a.currentTime || 0) - seconds, 0);
+        a.currentTime = newPosition;
       } else if (wavesurfer.current) {
         const currentPosition = wavesurfer.current.getCurrentTime();
         const newPosition = Math.max(currentPosition - seconds, 0);
@@ -408,6 +502,9 @@ const MediaPlayer = forwardRef(({ mediaFile, volume, amplification = 1, speed, s
     seekTo: (time) => {
       if (isVideo) {
         seekVideo(time);
+      } else if (performanceMode && longAudioRef.current) {
+        const a = longAudioRef.current;
+        a.currentTime = Math.max(0, Math.min(time, a.duration || Infinity));
       } else if (wavesurfer.current) {
         const duration = wavesurfer.current.getDuration();
         if (duration > 0) {
@@ -424,6 +521,10 @@ const MediaPlayer = forwardRef(({ mediaFile, volume, amplification = 1, speed, s
         const duration = getVideoDuration();
         seekVideo(duration);
         pauseVideo();
+      } else if (performanceMode && longAudioRef.current) {
+        const a = longAudioRef.current;
+        a.currentTime = a.duration || 0;
+        a.pause();
       } else if (wavesurfer.current) {
         const duration = wavesurfer.current.getDuration();
         wavesurfer.current.seekTo(1);
@@ -433,6 +534,8 @@ const MediaPlayer = forwardRef(({ mediaFile, volume, amplification = 1, speed, s
     getCurrentTime: () => {
       if (isVideo) {
         return getVideoCurrentTime();
+      } else if (performanceMode && longAudioRef.current) {
+        return longAudioRef.current.currentTime || 0;
       } else {
         return wavesurfer.current?.getCurrentTime() || 0;
       }
@@ -440,6 +543,8 @@ const MediaPlayer = forwardRef(({ mediaFile, volume, amplification = 1, speed, s
     getDuration: () => {
       if (isVideo) {
         return getVideoDuration();
+      } else if (performanceMode && longAudioRef.current) {
+        return longAudioRef.current.duration || 0;
       } else {
         return wavesurfer.current?.getDuration() || 0;
       }
@@ -447,6 +552,8 @@ const MediaPlayer = forwardRef(({ mediaFile, volume, amplification = 1, speed, s
     pauseAudio: () => {
       if (isVideo) {
         pauseVideo();
+      } else if (performanceMode && longAudioRef.current) {
+        longAudioRef.current.pause();
       } else {
         wavesurfer.current?.pause();
       }
@@ -454,12 +561,18 @@ const MediaPlayer = forwardRef(({ mediaFile, volume, amplification = 1, speed, s
     playAudio: () => {
       if (isVideo) {
         playVideo();
+      } else if (performanceMode && longAudioRef.current) {
+        longAudioRef.current.play();
       } else {
         wavesurfer.current?.play();
       }
     },
     getTimestamp: () => {
-      const currentTime = isVideo ? getVideoCurrentTime() : (wavesurfer.current?.getCurrentTime() || 0);
+      const currentTime = isVideo
+        ? getVideoCurrentTime()
+        : (performanceMode && longAudioRef.current
+            ? (longAudioRef.current.currentTime || 0)
+            : (wavesurfer.current?.getCurrentTime() || 0));
       const hours = Math.floor(currentTime / 3600);
       const minutes = Math.floor((currentTime % 3600) / 60);
       const seconds = (currentTime % 60).toFixed(1);
@@ -552,13 +665,53 @@ const MediaPlayer = forwardRef(({ mediaFile, volume, amplification = 1, speed, s
 
   return (
     <div className="w-full">
-      <div className="waveform-wrapper relative w-full h-16 bg-gray-100 rounded-md">
-        <div className="placeholder-waveform absolute inset-0 flex gap-1 items-center justify-center opacity-50 pointer-events-none">
-          {[...Array(50)].map((_, index) => (
-            <div key={index} className="placeholder-bar"></div>
-          ))}
-        </div>
-        <div ref={waveformRef} className="absolute inset-0 waveform-container"></div>
+      {/* Hidden audio element for performance mode long audio */}
+      {performanceMode && !isVideo && (
+        <audio
+          ref={longAudioRef}
+          preload="metadata"
+          style={{ display: 'none' }}
+        />
+      )}
+      <div ref={wrapperRef} className="waveform-wrapper relative w-full h-16 bg-gray-100 rounded-md">
+        {performanceMode ? (
+          <>
+            {/* Lightweight placeholder waveform when long audio is ready */}
+            {isLongAudioReady ? (
+              <div className="absolute inset-0 flex items-end gap-[2px] px-2 py-3">
+                {[...Array(placeholderBarCount)].map((_, i) => {
+                  const height = 10 + ((i * 37) % 48); // pseudo-random deterministic heights 10-58
+                  return (
+                    <div
+                      key={i}
+                      style={{ height: `${height}px`, width: '2px', backgroundColor: '#3b82f6', borderRadius: '2px', opacity: 0.9 }}
+                    />
+                  );
+                })}
+                {/* Ready badge */}
+                <div className="absolute top-1 right-1 text-[10px] px-2 py-[2px] rounded bg-green-100 text-green-700 border border-green-200">
+                  Ready
+                </div>
+              </div>
+            ) : (
+              // Before ready: show subtle skeleton bars
+              <div className="placeholder-waveform absolute inset-0 flex gap-1 items-center justify-center opacity-50 pointer-events-none">
+                {[...Array(placeholderBarCount)].map((_, index) => (
+                  <div key={index} className="placeholder-bar"></div>
+                ))}
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <div className="placeholder-waveform absolute inset-0 flex gap-1 items-center justify-center opacity-50 pointer-events-none">
+              {[...Array(50)].map((_, index) => (
+                <div key={index} className="placeholder-bar"></div>
+              ))}
+            </div>
+            <div ref={waveformRef} className="absolute inset-0 waveform-container"></div>
+          </>
+        )}
       </div>
     </div>
   );

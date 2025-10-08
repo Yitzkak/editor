@@ -21,6 +21,7 @@ function App() {
   const [caseSensitive, setCaseSensitive] = useState(false);
   const [audioLoading, setAudioLoading] = useState(false);
   const [autosuggestionEnabled, setAutosuggestionEnabled] = useState(true);
+  const [performanceMode, setPerformanceMode] = useState(false); // Hide waveform for >3h files
 
   // State for trigger buttons
   const [showSpeakerSnippets, setShowSpeakerSnippets] = useState(false);
@@ -60,6 +61,7 @@ function App() {
 
   // Function to handle file selection
   const handleFileUpload = (file) => {
+    console.log('[App] handleFileUpload: file selected', file?.name, file?.type, file?.size);
     setAudioLoading(true);
     setMediaFile(file);
   };
@@ -123,6 +125,18 @@ function App() {
   };
 
   // Function to update the current time
+  useEffect(() => {
+    console.log('[App] performanceMode changed:', performanceMode);
+  }, [performanceMode]);
+
+  useEffect(() => {
+    console.log('[App] audioLoading changed:', audioLoading);
+  }, [audioLoading]);
+
+  useEffect(() => {
+    console.log('[App] mediaFile changed:', mediaFile?.name, mediaFile?.type, mediaFile?.size);
+  }, [mediaFile]);
+
   useEffect(() => {
     const interval = setInterval(() => {
       if (mediaPlayerRef.current) {
@@ -350,6 +364,7 @@ function App() {
             mediaFile={mediaFile} 
             volume={volume || 1} 
             speed={playbackSpeed}
+            performanceMode={performanceMode}
             setAudioLoading={setAudioLoading}
             onWaveformClick={handleWaveformClick}
           />
@@ -359,6 +374,7 @@ function App() {
         <div className="mt-3">
           <Toolbar 
             onFileUpload={handleFileUpload}
+            setPerformanceMode={setPerformanceMode}
             togglePlayPause={togglePlayPause}
             increaseVolume ={increaseVolume}
             decreaseVolume={decreaseVolume}

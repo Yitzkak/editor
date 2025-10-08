@@ -5,7 +5,7 @@ import AmplifyVolumeModal from './AmplifyVolumeModal';
 import KeyboardShortcutsModal from './KeyboardShortcutsModal';
 
 //Icons import
-import { FiDownload, FiMoreHorizontal, FiZoomIn, FiZoomOut, FiSave } from 'react-icons/fi';
+import { FiDownload, FiMoreHorizontal, FiZoomIn, FiZoomOut, FiSave, FiClock } from 'react-icons/fi';
 import { TbPlayerSkipBack, TbPlayerSkipForward, TbPlayerTrackNext, TbPlayerTrackPrev, TbVolume, TbVolume2 } from "react-icons/tb";
 import { PiPlayPauseBold } from "react-icons/pi";
 import { RiFindReplaceLine, RiFileUploadLine } from "react-icons/ri";
@@ -15,6 +15,7 @@ import { FaExchangeAlt, FaRegKeyboard  } from "react-icons/fa";
 
 const Toolbar = ({ 
   onFileUpload,
+  setPerformanceMode,
   togglePlayPause,
   increaseVolume,
   decreaseVolume,
@@ -60,6 +61,7 @@ const Toolbar = ({
   onRemoveActiveListeningCues,
 }) => {
   const fileInputRef = useRef(null);
+  const [showPerfModal, setShowPerfModal] = useState(false);
   const [speedInput, setSpeedInput] = useState(`${speed}%`);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [isAmplifyOpen, setIsAmplifyOpen] = useState(false);
@@ -107,13 +109,15 @@ const Toolbar = ({
   const handleFileChange = (event) => {
     const file = event.target.files[0];
     if (file) {
+      console.log('[Toolbar] handleFileChange: file selected', file.name, file.type, file.size);
       onFileUpload(file); // Pass the selected file to App.js
     }
   };
 
   // Open file input dialog when upload icon is clicked
   const handleUploadClick = () => {
-    fileInputRef.current.click();
+    console.log('[Toolbar] Upload clicked: opening performance mode modal');
+    setShowPerfModal(true);
   };
 
   const handleTimestamp = () => {
@@ -255,6 +259,50 @@ const Toolbar = ({
         onChange={handleFileChange}
         style={{ display: 'none' }}
       />
+
+      {/* Performance Mode Modal */}
+      {showPerfModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black opacity-40" onClick={() => setShowPerfModal(false)}></div>
+          <div className="relative bg-white rounded-xl shadow-2xl p-6 w-[28rem] border">
+            <div className="flex items-center gap-3 mb-3">
+              <RiFileUploadLine size={22} className="text-indigo-600" />
+              <h3 className="text-base font-semibold text-gray-800">Choose upload mode</h3>
+            </div>
+            <p className="text-sm text-gray-600 mb-5">Is your audio/video file longer than 3 hours?</p>
+            <div className="grid grid-cols-1 gap-3">
+              <button
+                type="button"
+                className="flex items-center gap-3 px-4 py-3 text-sm rounded-lg border hover:border-gray-400 bg-gray-50 hover:bg-gray-100 text-gray-800"
+                onClick={() => {
+                  console.log('[Toolbar] Chose Up to 3 hours (waveform on)');
+                  setPerformanceMode(false);
+                  setShowPerfModal(false);
+                  fileInputRef.current?.click();
+                }}
+              >
+                <RiFileUploadLine size={18} className="text-blue-600" />
+                <span className="font-medium">Up to 3 hours</span>
+                <span className="ml-auto text-xs text-gray-500">Show waveform</span>
+              </button>
+              <button
+                type="button"
+                className="flex items-center gap-3 px-4 py-3 text-sm rounded-lg border hover:border-indigo-400 bg-indigo-50 hover:bg-indigo-100 text-indigo-800"
+                onClick={() => {
+                  console.log('[Toolbar] Chose Over 3 hours (performance mode)');
+                  setPerformanceMode(true);
+                  setShowPerfModal(false);
+                  fileInputRef.current?.click();
+                }}
+              >
+                <FiClock size={18} className="text-indigo-600" />
+                <span className="font-medium">Over 3 hours</span>
+                <span className="ml-auto text-xs text-indigo-600">Performance mode</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Three-dot menu */}
       <div className="relative">
