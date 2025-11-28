@@ -133,6 +133,8 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
   const [findText, setFindText] = useState('');
   const [replaceTextValue, setReplaceTextValue] = useState('');
   const [findResultCount, setFindResultCount] = useState(0);
+  const [caseSensitive, setCaseSensitive] = useState(false);
+  const [wholeWord, setWholeWord] = useState(true);
 
   // Function to capitalize all letters
   const formatUppercase = () => {
@@ -1144,7 +1146,11 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
       // If this line is a speaker line
       if (isSpeakerLine(line)) {
         // If previous line exists and does not end with punctuation, try to merge
-        if (fixedLines.length > 0 && !endsWithPunctuation(fixedLines[fixedLines.length - 1])) {
+      if (
+        fixedLines.length > 0 &&
+        !endsWithPunctuation(fixedLines[fixedLines.length - 1]) &&
+        isSpeakerLine(fixedLines[fixedLines.length - 1])
+      ) {
           const { label, rest } = extractLabel(line);
           const endIdx = findFirstSentenceEnd(rest);
           if (endIdx !== -1) {
@@ -1184,6 +1190,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
       // Otherwise, look ahead to the next line(s)
       let merged = line;
       let j = i + 1;
+      let brokeOnSpeaker = false;
       while (j < lines.length) {
         let nextLine = lines[j];
         if (!nextLine.trim()) {
@@ -1192,6 +1199,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
           continue;
         }
         if (isSpeakerLine(nextLine)) {
+          brokeOnSpeaker = true;
           break;
         }
         const { label, rest } = extractLabel(nextLine);
@@ -1216,8 +1224,19 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
         }
         j++;
       }
+      if (brokeOnSpeaker) {
+        if (merged.trim()) {
+          fixedLines.push(merged.trim());
+        }
+        i = j;
+        continue;
+      }
       if (j >= lines.length) {
-        fixedLines.push(merged.trim());
+        if (merged.trim()) {
+          fixedLines.push(merged.trim());
+        }
+        i = j;
+        continue;
       }
       i = j + 1;
     }
@@ -1362,33 +1381,38 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     return `${sign}${hh}:${pad(mm)}:${ss.padStart(4,'0')}`;
   };
 
+  const stackedPanelWidth = Math.max(
+    showFindReplace ? 320 : 0,
+    showNotes ? notesWidth : 0
+  );
+
   return (
-    <div className="w-full h-[460px] shadow-lg border relative">
-      {/* Editor + Notes layout */}
+    <div className="w-full h-[460px] shadow-lg border">
       <div className="flex h-full">
-        {/* Quill editor container */}
-        <div
-          ref={editorRef}
-          className="flex-1 font-monox bg-white rounded-md h-full break-words word-space-2 whitespace-pre-wrap"
-          title="Right-click on timestamps (like '0:00:36.4 S2:') to play audio from that point"
-        ></div>
-        {/* Speaker snippets panel (conditionally shown) */}
-        {showSpeakerSnippets && (
-          <>
-            {/* Resize handle for snippets */}
-            <div
-              onMouseDown={(e) => {
-                isResizingSnippetsRef.current = true;
-                startXSnippetsRef.current = e.clientX;
-                startWidthSnippetsRef.current = snippetsWidth;
-                document.body.style.cursor = 'col-resize';
-                document.body.style.userSelect = 'none';
-              }}
-              className="w-1 cursor-col-resize bg-transparent hover:bg-indigo-200"
-              title="Drag to resize snippets"
-            />
-            <div className="h-full border-l bg-white" style={{ width: snippetsWidth }}>
-            <div className="h-full flex flex-col">
+        <div className="flex h-full flex-1 relative min-w-0">
+          {/* Quill editor container */}
+          <div
+            ref={editorRef}
+            className="flex-1 min-w-0 font-monox bg-white rounded-md h-full break-words word-space-2 whitespace-pre-wrap"
+            title="Right-click on timestamps (like '0:00:36.4 S2:') to play audio from that point"
+          ></div>
+          {/* Speaker snippets panel (conditionally shown) */}
+          {showSpeakerSnippets && (
+            <React.Fragment>
+              {/* Resize handle for snippets */}
+              <div
+                onMouseDown={(e) => {
+                  isResizingSnippetsRef.current = true;
+                  startXSnippetsRef.current = e.clientX;
+                  startWidthSnippetsRef.current = snippetsWidth;
+                  document.body.style.cursor = 'col-resize';
+                  document.body.style.userSelect = 'none';
+                }}
+                className="w-1 cursor-col-resize bg-transparent hover:bg-indigo-200"
+                title="Drag to resize snippets"
+              />
+              <div className="h-full border-l bg-white" style={{ width: snippetsWidth }}>
+                <div className="h-full flex flex-col">
               <div className="px-3 pt-3 pb-1 text-xs font-semibold text-gray-700 flex items-center justify-between">
                 <span>Speaker Snippets</span>
                 <div className="flex items-center gap-2 text-[11px]">
@@ -1562,38 +1586,10 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
                 </button>
               </div>
             </div>
-          </div>
-          </>
+              </div>
+            </React.Fragment>
         )}
-        {showNotes && (
-          <>
-            {/* Resize handle */}
-            <div
-              onMouseDown={(e) => {
-                isResizingRef.current = true;
-                startXRef.current = e.clientX;
-                startWidthRef.current = notesWidth;
-                document.body.style.cursor = 'col-resize';
-                document.body.style.userSelect = 'none';
-              }}
-              className="w-1 cursor-col-resize bg-transparent hover:bg-blue-200"
-              title="Drag to resize notes"
-            />
-            <div className="h-full border-l bg-gray-50" style={{ width: notesWidth }}>
-            <div className="h-full flex flex-col">
-              <div className="px-3 pt-3 pb-1 text-xs font-semibold text-gray-600">Notes</div>
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Type your notes here..."
-                className="flex-1 w-full p-3 bg-transparent outline-none resize-none text-sm"
-              />
-            </div>
-            </div>
-          </>
-        )}
-      </div>
-      {suggestions.length > 0 && (
+        {suggestions.length > 0 && (
         <div
           ref={suggestionsBoxRef}
           className="absolute z-40 bg-white border border-gray-300 shadow-xl rounded-lg p-1 text-xs min-w-[160px] max-w-[260px] transition-all duration-200 ease-out animate-fade-in"
@@ -1755,86 +1751,141 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
           )}
         </div>
       )}
-
-      {/* Find & Replace panel */}
-      {showFindReplace && (
-        <div className="h-full border-l bg-white" style={{ width: 320 }}>
-          <div className="h-full flex flex-col">
-            <div className="px-3 pt-3 pb-1 text-xs font-semibold text-gray-700 flex items-center justify-between">
-              <span>Find & Replace</span>
-            </div>
-            <div className="flex-1 overflow-auto p-3 space-y-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Find</label>
-                <input
-                  type="text"
-                  className="w-full border rounded px-2 py-1 text-xs"
-                  value={findText}
-                  onChange={e => setFindText(e.target.value)}
-                  placeholder="Enter text to find"
-                />
+      </div>
+      {(showFindReplace || showNotes) && (
+        <div
+          className="flex h-full flex-col border-l bg-white"
+          style={{ width: stackedPanelWidth || undefined }}
+        >
+          {showFindReplace && (
+            <div className="flex flex-col" style={{ width: '100%' }}>
+              <div className="px-3 pt-3 pb-1 text-xs font-semibold text-gray-700 flex items-center justify-between">
+                <span>Find & Replace</span>
               </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Replace</label>
-                <input
-                  type="text"
-                  className="w-full border rounded px-2 py-1 text-xs"
-                  value={replaceTextValue}
-                  onChange={e => setReplaceTextValue(e.target.value)}
-                  placeholder="Enter replacement text"
-                />
-              </div>
-              <div className="flex gap-2 mt-2">
-                <button
-                  className="px-3 py-1 rounded bg-indigo-500 text-white text-xs font-semibold"
-                  onClick={() => {
-                    if (!findText) return;
-                    // Count matches
-                    const content = quillInstanceRef.current?.getText() || '';
-                    const regex = new RegExp(findText, 'gi');
-                    const matches = content.match(regex);
-                    setFindResultCount(matches ? matches.length : 0);
-                    // Highlight first match
-                    if (matches && matches.length > 0) {
-                      const idx = content.toLowerCase().indexOf(findText.toLowerCase());
-                      if (idx !== -1) {
-                        quillInstanceRef.current.setSelection(idx, findText.length);
-                        quillInstanceRef.current.formatText(idx, findText.length, { background: '#fde68a' });
-                      }
-                    }
-                  }}
-                >
-                  Find
-                </button>
-                <button
-                  className="px-3 py-1 rounded bg-green-500 text-white text-xs font-semibold"
-                  onClick={() => {
-                    if (!findText) return;
-                    // Replace all
-                    const content = quillInstanceRef.current?.getText() || '';
-                    const regex = new RegExp(findText, 'gi');
-                    const newContent = content.replace(regex, replaceTextValue);
-                    quillInstanceRef.current?.setText(newContent);
-                    setFindResultCount(0);
-                  }}
-                >
-                  Replace All
-                </button>
-              </div>
-              {findResultCount > 0 && (
-                <div className="mt-2 text-xs text-gray-500">
-                  {findResultCount} match{findResultCount > 1 ? 'es' : ''} found.
+              <div className="flex-1 overflow-auto p-3 space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Find</label>
+                  <input
+                    type="text"
+                    className="w-full border rounded px-2 py-1 text-xs"
+                    value={findText}
+                    onChange={e => setFindText(e.target.value)}
+                    placeholder="Enter text to find"
+                  />
                 </div>
-              )}
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Replace</label>
+                  <input
+                    type="text"
+                    className="w-full border rounded px-2 py-1 text-xs"
+                    value={replaceTextValue}
+                    onChange={e => setReplaceTextValue(e.target.value)}
+                    placeholder="Enter replacement text"
+                  />
+                </div>
+                <div className="flex gap-3 mt-4 text-xs text-gray-600">
+                  <label className="inline-flex items-center gap-1">
+                    <input
+                      type="checkbox"
+                      className="rounded text-indigo-600"
+                      checked={wholeWord}
+                      onChange={(e) => setWholeWord(e.target.checked)}
+                    />
+                    Whole word
+                  </label>
+                  <label className="inline-flex items-center gap-1">
+                    <input
+                      type="checkbox"
+                      className="rounded text-indigo-600"
+                      checked={caseSensitive}
+                      onChange={(e) => setCaseSensitive(e.target.checked)}
+                    />
+                    Case sensitive
+                  </label>
+                </div>
+                <div className="flex gap-2 mt-3">
+                  <button
+                    className="px-3 py-1 rounded bg-indigo-500 text-white text-xs font-semibold"
+                    onClick={() => {
+                      if (!findText) return;
+                      const escaped = findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                      const pattern = wholeWord ? `\\b${escaped}\\b` : escaped;
+                      const flags = caseSensitive ? 'g' : 'gi';
+                      const regex = new RegExp(pattern, flags);
+                      const content = quillInstanceRef.current?.getText() || '';
+                      const matches = content.match(regex);
+                      setFindResultCount(matches ? matches.length : 0);
+                      if (matches && matches.length > 0) {
+                        const idx = content.toLowerCase().indexOf(findText.toLowerCase());
+                        if (idx !== -1) {
+                          quillInstanceRef.current.setSelection(idx, findText.length);
+                          quillInstanceRef.current.formatText(idx, findText.length, { background: '#fde68a' });
+                        }
+                      }
+                    }}
+                  >
+                    Find
+                  </button>
+                  <button
+                    className="px-3 py-1 rounded bg-green-500 text-white text-xs font-semibold"
+                    onClick={() => {
+                      if (!findText) return;
+                      const escaped = findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                      const pattern = wholeWord ? `\\b${escaped}\\b` : escaped;
+                      const flags = caseSensitive ? 'g' : 'gi';
+                      const regex = new RegExp(pattern, flags);
+                      const content = quillInstanceRef.current?.getText() || '';
+                      const newContent = content.replace(regex, replaceTextValue);
+                      quillInstanceRef.current?.setText(newContent);
+                      setFindResultCount(0);
+                    }}
+                  >
+                    Replace All
+                  </button>
+                </div>
+                {findResultCount > 0 && (
+                  <div className="mt-2 text-xs text-gray-500">
+                    {findResultCount} match{findResultCount > 1 ? 'es' : ''} found.
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          )}
+          {showNotes && (
+            <div className="flex h-full border-t">
+              {/* Resize handle */}
+              <div
+                onMouseDown={(e) => {
+                  isResizingRef.current = true;
+                  startXRef.current = e.clientX;
+                  startWidthRef.current = notesWidth;
+                  document.body.style.cursor = 'col-resize';
+                  document.body.style.userSelect = 'none';
+                }}
+                className="w-1 cursor-col-resize bg-transparent hover:bg-blue-200"
+                title="Drag to resize notes"
+              />
+              <div
+                className="h-full bg-gray-50 flex-1 flex flex-col"
+                style={{ width: showFindReplace ? stackedPanelWidth : notesWidth || stackedPanelWidth }}
+              >
+                <div className="px-3 pt-3 pb-1 text-xs font-semibold text-gray-600">Notes</div>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Type your notes here..."
+                  className="flex-1 w-full p-3 bg-transparent outline-none resize-none text-sm"
+                />
+              </div>
+            </div>
+          )}
         </div>
       )}
       
-      <div className="absolute top-2 right-2 flex flex-col gap-2 z-50">
+      <div className="ml-3 flex flex-col gap-2 py-2 pr-2">
         {/* Speaker snippets toggle */}
         <button
-          className={`mb-2 w-8 h-8 flex items-center justify-center rounded-lg shadow transition-colors ${showSpeakerSnippets ? 'bg-indigo-500 text-white' : 'bg-white text-indigo-500 hover:bg-indigo-100'}`}
+          className={`w-8 h-8 flex items-center justify-center rounded-lg shadow transition-colors ${showSpeakerSnippets ? 'bg-indigo-500 text-white' : 'bg-white text-indigo-500 hover:bg-indigo-100'}`}
           title="Speaker Snippets"
           onClick={() => setShowSpeakerSnippets(v => !v)}
         >
@@ -1844,7 +1895,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
         </button>
         {/* Notes toggle */}
         <button
-          className={`mb-2 w-8 h-8 flex items-center justify-center rounded-lg shadow transition-colors ${showNotes ? 'bg-indigo-500 text-white' : 'bg-white text-indigo-500 hover:bg-indigo-100'}`}
+          className={`w-8 h-8 flex items-center justify-center rounded-lg shadow transition-colors ${showNotes ? 'bg-indigo-500 text-white' : 'bg-white text-indigo-500 hover:bg-indigo-100'}`}
           title="Notes"
           onClick={() => setShowNotes(v => !v)}
         >
@@ -1854,7 +1905,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
         </button>
         {/* Find & Replace toggle */}
         <button
-          className={`mb-2 w-8 h-8 flex items-center justify-center rounded-lg shadow transition-colors ${showFindReplace ? 'bg-indigo-500 text-white' : 'bg-white text-indigo-500 hover:bg-indigo-100'}`}
+          className={`w-8 h-8 flex items-center justify-center rounded-lg shadow transition-colors ${showFindReplace ? 'bg-indigo-500 text-white' : 'bg-white text-indigo-500 hover:bg-indigo-100'}`}
           title="Find & Replace"
           onClick={() => setShowFindReplace(v => !v)}
         >
@@ -1867,6 +1918,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
         </button>
       </div>
     </div>
+  </div>
   );
 });
 
