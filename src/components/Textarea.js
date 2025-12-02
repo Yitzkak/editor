@@ -328,7 +328,8 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
   };
 
   // Function to insert a timestamp
-  const insertTimestamp = (timestamp) => {
+  // Insert a timestamp. If `speakerNumber` is provided, use it for the S# label when inserting at paragraph start.
+  const insertTimestamp = (timestamp, speakerNumber = null) => {
     if (!quillInstanceRef.current) return;
 
     // Get the current selection
@@ -336,18 +337,73 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     if (range) {
         // Check if it's the start of a paragraph
         const isStartOfParagraph = range.index === 0 || quillInstanceRef.current.getText(range.index - 1, 1) === "\n";
-        const formattedTimestamp = isStartOfParagraph ? `${timestamp} S1: ` : `[${timestamp}] ____ `;
+        const speakerLabel = speakerNumber ? `S${speakerNumber}` : 'S1';
+        const formattedTimestamp = isStartOfParagraph ? `${timestamp} ${speakerLabel}: ` : `[${timestamp}] ____ `;
 
         // Insert the timestamp at the selection index
         quillInstanceRef.current.insertText(range.index, formattedTimestamp);
 
-        // Calculate the position of "S1" number (right after "S")
-        const highlightStart = range.index + timestamp.length + 2; // Position of the number after "S"
-        const highlightEnd = highlightStart + 1; // Select just the number (e.g., "1")
-
-        // Set selection to highlight the number after "S"
-        quillInstanceRef.current.setSelection(highlightStart, 1);
+        if (isStartOfParagraph) {
+          // Highlight the speaker number (right after "S") for paragraph start timestamps
+          const highlightStart = range.index + timestamp.length + 2; // Position of the number after "S"
+          quillInstanceRef.current.setSelection(highlightStart, 1); // Select just the digit
+        } else {
+          // Position cursor after the underscores for blank timestamps
+          const cursorPos = range.index + formattedTimestamp.length;
+          quillInstanceRef.current.setSelection(cursorPos);
+        }
     }
+  };
+
+  // Force insertion of a proper timestamp regardless of cursor location (always use `${timestamp} S#:`)
+  const insertTimestampForced = (timestamp, speakerNumber = 1) => {
+    if (!quillInstanceRef.current) return;
+    const quill = quillInstanceRef.current;
+    const range = quill.getSelection() || { index: quill.getLength() };
+    const speakerLabel = `S${speakerNumber}`;
+    const formattedTimestamp = `${timestamp} ${speakerLabel}: `;
+    quill.insertText(range.index, formattedTimestamp);
+    quill.setSelection(range.index + formattedTimestamp.length);
+  };
+
+  // Split paragraph at cursor, insert timestamp, and move text after cursor to a new paragraph.
+  // Always uses the configured speaker number (no increment). Highlights the speaker number for editing.
+  const splitParagraphWithTimestamp = (timestamp, speakerNumber = 1) => {
+    if (!quillInstanceRef.current) return;
+    const quill = quillInstanceRef.current;
+    const range = quill.getSelection();
+    if (!range) return;
+
+    // Get the full content to find paragraph boundaries
+    const fullText = quill.getText();
+    let cursorIndex = range.index;
+
+    // Find the end of the current paragraph (look forwards for '\n' or end of text)
+    let paragraphEnd = fullText.length;
+    for (let i = cursorIndex; i < fullText.length; i++) {
+      if (fullText[i] === '\n') {
+        paragraphEnd = i;
+        break;
+      }
+    }
+
+    // Get the text from cursor to end of paragraph
+    const textAfterCursor = fullText.substring(cursorIndex, paragraphEnd);
+
+    // Insert a newline at cursor, then insert the new timestamp + speaker (no increment) + text after
+    const newTimestamp = `${timestamp} S${speakerNumber}: `;
+    
+    // Delete text after cursor up to the end of paragraph
+    quill.deleteText(cursorIndex, textAfterCursor.length);
+
+    // Insert two newlines (creates an empty line) and then the new paragraph
+    quill.insertText(cursorIndex, '\n\n');
+    quill.insertText(cursorIndex + 2, newTimestamp + textAfterCursor);
+
+    // Highlight the speaker number (the digit after 'S') for editing
+    // Position of 'S' is at: cursorIndex + 2 (for the two newlines) + timestamp.length + 1 (for space)
+    const speakerNumberPos = cursorIndex + 2 + timestamp.length + 2; // +2 for " S"
+    quill.setSelection(speakerNumberPos, 1); // Select just the digit
   };
 
   const findAndHighlight = (text, caseSensitive = false, wholeWord = false) => {
@@ -742,6 +798,8 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
   // Expose the `insertTimestamp` method to the parent component
   useImperativeHandle(ref, () => ({
     insertTimestamp,
+    insertTimestampForced,
+    splitParagraphWithTimestamp,
     findAndHighlight,
     replaceText,
     replaceAll,

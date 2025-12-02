@@ -29,6 +29,11 @@ const Toolbar = ({
   currentTime,
   onGetTimestamp,
   onInsertTimestamp,
+  // Right-Ctrl timestamp behavior props (optional)
+  rightCtrlInsertProper,
+  setRightCtrlInsertProper,
+  rightCtrlSpeaker,
+  setRightCtrlSpeaker,
   toggleFindReplace,
   onAmplifyClick,
   handleAmplificationChange,
@@ -314,6 +319,32 @@ const Toolbar = ({
         {/* Dropdown menu */}
         {dropdownOpen && (
           <div ref={dropdownRef} className="absolute right-0 mt-2 w-56 bg-white border rounded-lg shadow-lg z-50 py-3">
+            {/* Right-Ctrl timestamp option */}
+            <div className="flex items-center w-full px-6 py-3 text-[12px] hover:bg-gray-100">
+              <input
+                type="checkbox"
+                checked={!!rightCtrlInsertProper}
+                onChange={(e) => {
+                  if (typeof setRightCtrlInsertProper === 'function') setRightCtrlInsertProper(e.target.checked);
+                }}
+                className="mr-3"
+                id="right-ctrl-toggle"
+              />
+              <label htmlFor="right-ctrl-toggle" className="cursor-pointer">
+                Right-Ctrl inserts proper timestamp
+              </label>
+              <input
+                type="number"
+                min="1"
+                value={rightCtrlSpeaker || 1}
+                onChange={(e) => {
+                  const v = parseInt(e.target.value || '1', 10) || 1;
+                  if (typeof setRightCtrlSpeaker === 'function') setRightCtrlSpeaker(v);
+                }}
+                className="ml-2 w-16 text-sm px-1 py-0.5 border rounded"
+                title="Speaker number (S#)"
+              />
+            </div>
             {/* Swap Speaker Labels Option */}
             <button
               onClick={() => {

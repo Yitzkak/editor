@@ -23,6 +23,9 @@ function App() {
   const [audioLoading, setAudioLoading] = useState(false);
   const [autosuggestionEnabled, setAutosuggestionEnabled] = useState(true);
   const [performanceMode, setPerformanceMode] = useState(false); // Hide waveform for >3h files
+  // Right-Ctrl timestamp behavior: when true, pressing Right Control inserts a proper timestamp S# regardless of cursor
+  const [rightCtrlInsertProper, setRightCtrlInsertProper] = useState(false);
+  const [rightCtrlSpeaker, setRightCtrlSpeaker] = useState(1);
 
   // State for trigger buttons
   const [showSpeakerSnippets, setShowSpeakerSnippets] = useState(false);
@@ -110,7 +113,9 @@ function App() {
   };
 
   const getTimestamp = () => mediaPlayerRef.current?.getTimestamp();
-  const insertTimestamp = (timestamp) => editorRef.current?.insertTimestamp(timestamp);
+  const insertTimestamp = (timestamp, speakerNumber) => editorRef.current?.insertTimestamp(timestamp, speakerNumber);
+  const insertTimestampForced = (timestamp, speakerNumber) => editorRef.current?.insertTimestampForced?.(timestamp, speakerNumber);
+  const splitParagraphWithTimestamp = (timestamp, speakerNumber) => editorRef.current?.splitParagraphWithTimestamp?.(timestamp, speakerNumber);
 
   // Function to download the transcript
   const downloadTranscript = () => {
@@ -180,11 +185,25 @@ function App() {
         togglePlayPause(); // Play/Pause
       }
   
-      if (e.ctrlKey && e.shiftKey && e.code === "ControlLeft" || e.code === "ControlRight") {
+      // If Right-Ctrl pressed alone and the dropdown option is enabled, split paragraph with timestamp
+      if (e.code === 'ControlRight' && rightCtrlInsertProper && !e.shiftKey) {
         e.preventDefault();
         const timestamp = getTimestamp();
         if (timestamp) {
-          insertTimestamp(timestamp); // Insert Timestamp
+          // Split paragraph: move text after cursor to new paragraph with incremented speaker
+          splitParagraphWithTimestamp(timestamp, rightCtrlSpeaker);
+        }
+        return;
+      }
+
+      // Right-Ctrl (when checkbox unchecked) or Shift+Ctrl (either left or right) inserts timestamp conditionally depending on cursor.
+      if ((e.code === 'ControlRight' && !rightCtrlInsertProper && !e.shiftKey) || (e.ctrlKey && e.shiftKey && (e.code === "ControlLeft" || e.code === "ControlRight"))) {
+        e.preventDefault();
+        const timestamp = getTimestamp();
+        if (timestamp) {
+          // Pass the configured speaker number so that if insertion is at paragraph start
+          // the speaker label used will match the dropdown speaker choice.
+          insertTimestamp(timestamp, rightCtrlSpeaker);
         }
       }
   
@@ -208,7 +227,7 @@ function App() {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [togglePlayPause, getTimestamp, insertTimestamp, skipBack, skipForward]);
+  }, [togglePlayPause, getTimestamp, insertTimestamp, insertTimestampForced, splitParagraphWithTimestamp, skipBack, skipForward, rightCtrlInsertProper, rightCtrlSpeaker]);
 
   const handleReplaceSpeakerLabel = (fromLabel, toLabel) => {
     if (editorRef.current) {
@@ -390,6 +409,11 @@ function App() {
             currentTime={currentTime}
             onGetTimestamp={getTimestamp}
             onInsertTimestamp={insertTimestamp}
+            // Right-Ctrl timestamp behavior
+            rightCtrlInsertProper={rightCtrlInsertProper}
+            setRightCtrlInsertProper={setRightCtrlInsertProper}
+            rightCtrlSpeaker={rightCtrlSpeaker}
+            setRightCtrlSpeaker={setRightCtrlSpeaker}
             toggleFindReplace={toggleFindReplace}
             handleAmplificationChange={handleAmplificationChange}
             amplification={amplification}
