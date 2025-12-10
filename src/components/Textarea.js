@@ -135,6 +135,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
   const [findResultCount, setFindResultCount] = useState(0);
   const [caseSensitive, setCaseSensitive] = useState(false);
   const [wholeWord, setWholeWord] = useState(true);
+  const [showHighlightRepeated, setShowHighlightRepeated] = useState(false);
 
   // Function to capitalize all letters
   const formatUppercase = () => {
@@ -404,6 +405,19 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     // Position of 'S' is at: cursorIndex + 2 (for the two newlines) + timestamp.length + 1 (for space)
     const speakerNumberPos = cursorIndex + 2 + timestamp.length + 2; // +2 for " S"
     quill.setSelection(speakerNumberPos, 1); // Select just the digit
+  };
+
+  // Return true if the current selection is at the start of a paragraph/line
+  const isCursorAtStartOfParagraph = () => {
+    if (!quillInstanceRef.current) return false;
+    const quill = quillInstanceRef.current;
+    const range = quill.getSelection();
+    if (!range) return false;
+    const idx = range.index;
+    if (idx === 0) return true;
+    // If previous character is a newline, we're at the start of a paragraph
+    const prev = quill.getText(idx - 1, 1);
+    return prev === '\n';
   };
 
   const findAndHighlight = (text, caseSensitive = false, wholeWord = false) => {
@@ -795,11 +809,64 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     suggestionContextRef.current = { prefix, cursorIndex: range.index };
   }, [selectedSuggestionIndex]);
 
+  // Function to toggle highlight repeated consecutive speakers
+  const highlightRepeatedSpeakers = (shouldHighlight = true) => {
+    if (!quillInstanceRef.current) return;
+    
+    // Get all text from the editor
+    const content = quillInstanceRef.current.getText();
+    
+    // If we're removing highlight, just clear all background colors
+    if (!shouldHighlight) {
+      quillInstanceRef.current.formatText(0, content.length, { background: false });
+      console.log('[Textarea] Cleared all speaker highlights');
+      return;
+    }
+    
+    // Pattern to match speaker labels: S1, S2, S3, etc.
+    const speakerPattern = /\bS(\d+)\b/g;
+    
+    let match;
+    let previousSpeaker = null;
+    const positions = []; // Array to store positions of repeated speakers
+    
+    // First pass: find all speaker labels and identify repeats
+    while ((match = speakerPattern.exec(content)) !== null) {
+      const currentSpeaker = match[1]; // Get just the number (e.g., "1" from "S1")
+      if (previousSpeaker === currentSpeaker) {
+        // Found a repeat - highlight this occurrence
+        positions.push({
+          index: match.index,
+          length: match[0].length,
+          speaker: currentSpeaker
+        });
+      }
+      previousSpeaker = currentSpeaker;
+    }
+    
+    // If no repeats found, just return without alert
+    if (positions.length === 0) {
+      console.log('[Textarea] No repeated consecutive speakers found');
+      return;
+    }
+    
+    // Clear any previous formatting first by removing all background colors
+    quillInstanceRef.current.formatText(0, content.length, { background: false });
+    
+    // Apply red highlight to repeated speakers
+    positions.forEach(({ index, length }) => {
+      quillInstanceRef.current.formatText(index, length, { background: '#FF6B6B' }); // Red highlight
+    });
+    
+    console.log(`[Textarea] Highlighted ${positions.length} repeated speaker(s)`);
+  };
+
   // Expose the `insertTimestamp` method to the parent component
   useImperativeHandle(ref, () => ({
     insertTimestamp,
     insertTimestampForced,
     splitParagraphWithTimestamp,
+    isCursorAtStartOfParagraph,
     findAndHighlight,
     replaceText,
     replaceAll,
@@ -808,6 +875,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     swapSpeakerLabels,
     navigateToTime,
     makeTimestampsClickable,
+    highlightRepeatedSpeakers,
     setText: (text) => {
       if (quillInstanceRef.current) {
         quillInstanceRef.current.setText(text);
@@ -1949,6 +2017,20 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
             <path d="M3 7v14l9-7z"/>
+          </svg>
+        </button>
+        {/* Highlight repeated speakers button (placed with snippets) */}
+        <button
+          className={`w-8 h-8 flex items-center justify-center rounded-lg shadow transition-colors ${showHighlightRepeated ? 'bg-indigo-500 text-white' : 'bg-white text-indigo-500 hover:bg-indigo-100'}`}
+          title="Highlight Repeated Speakers"
+          onClick={() => {
+            const newState = !showHighlightRepeated;
+            setShowHighlightRepeated(newState);
+            highlightRepeatedSpeakers(newState);
+          }}
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <path d="M3 10h4v11H3zM9 3h4v18H9zM15 7h4v14h-4z" />
           </svg>
         </button>
         {/* Notes toggle */}

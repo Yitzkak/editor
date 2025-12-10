@@ -185,13 +185,25 @@ function App() {
         togglePlayPause(); // Play/Pause
       }
   
-      // If Right-Ctrl pressed alone and the dropdown option is enabled, split paragraph with timestamp
+      // If Right-Ctrl pressed alone and the dropdown option is enabled, either insert a proper timestamp
+      // if the cursor is at the start of a line, or split the paragraph otherwise.
       if (e.code === 'ControlRight' && rightCtrlInsertProper && !e.shiftKey) {
         e.preventDefault();
         const timestamp = getTimestamp();
         if (timestamp) {
-          // Split paragraph: move text after cursor to new paragraph with incremented speaker
-          splitParagraphWithTimestamp(timestamp, rightCtrlSpeaker);
+          try {
+            const atStart = !!editorRef.current?.isCursorAtStartOfParagraph?.();
+            if (atStart) {
+              // Insert proper timestamp and highlight speaker number
+              insertTimestamp(timestamp, rightCtrlSpeaker);
+            } else {
+              // Cursor not at start — split paragraph and insert new paragraph with timestamp
+              splitParagraphWithTimestamp(timestamp, rightCtrlSpeaker);
+            }
+          } catch (err) {
+            // Fallback to splitting if anything goes wrong
+            splitParagraphWithTimestamp(timestamp, rightCtrlSpeaker);
+          }
         }
         return;
       }
@@ -349,6 +361,13 @@ function App() {
   const handleRemoveActiveListeningCues = () => {
     if (editorRef.current && editorRef.current.removeActiveListeningCues) {
       editorRef.current.removeActiveListeningCues();
+    }
+  };
+
+  // Add a handler to trigger highlightRepeatedSpeakers on the Textarea ref
+  const handleHighlightRepeatedSpeakers = () => {
+    if (editorRef.current && editorRef.current.highlightRepeatedSpeakers) {
+      editorRef.current.highlightRepeatedSpeakers();
     }
   };
 

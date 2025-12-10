@@ -431,6 +431,7 @@ const Toolbar = ({
               <span style={{ marginRight: 16, fontWeight: 600, fontSize: 10}}>&#128483;</span>
               <span>Remove Active Listening Cues</span>
             </button>
+            {/* Highlight repeated speakers moved to Textarea button group */}
           </div>
         )}
 
