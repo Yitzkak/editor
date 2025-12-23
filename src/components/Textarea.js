@@ -66,6 +66,17 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
   const timestampInvalidsRef = useRef([]);
   const [showInvalidList, setShowInvalidList] = useState(false);
   const [invalidPanelMaxHeight, setInvalidPanelMaxHeight] = useState(400);
+  const [invalidPanelWidth, setInvalidPanelWidth] = useState(() => {
+    try {
+      const saved = parseInt(localStorage.getItem('invalid_panel_width'), 10);
+      return Number.isFinite(saved) && saved > 120 ? saved : 320;
+    } catch (e) {
+      return 320;
+    }
+  });
+  const isResizingInvalidRef = useRef(false);
+  const startXInvalidRef = useRef(0);
+  const startWidthInvalidRef = useRef(320);
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState({
@@ -1270,6 +1281,35 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
       window.removeEventListener('mouseup', handleMouseUp);
     };
   }, []);
+
+  // Handle drag to resize invalid timestamps panel
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (!isResizingInvalidRef.current) return;
+      const delta = startXInvalidRef.current - e.clientX;
+      const next = Math.max(160, Math.min(900, startWidthInvalidRef.current + delta));
+      setInvalidPanelWidth(next);
+    };
+    const handleMouseUp = () => {
+      if (!isResizingInvalidRef.current) return;
+      isResizingInvalidRef.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
+
+  // Persist invalid panel width
+  useEffect(() => {
+    try {
+      localStorage.setItem('invalid_panel_width', String(invalidPanelWidth));
+    } catch (e) {}
+  }, [invalidPanelWidth]);
 
   useEffect(() => {
     if (!editorRef.current) return; // Exit if editorRef is not ready
@@ -2512,7 +2552,20 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
             </div>
           )}
           {showInvalidList && !(showFindReplace || showNotes) && (
-            <div className="flex flex-col" style={{ width: '100%' }}>
+            <div className="flex h-full flex-col relative" style={{ width: invalidPanelWidth }}>
+              <div
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  isResizingInvalidRef.current = true;
+                  startXInvalidRef.current = e.clientX;
+                  startWidthInvalidRef.current = invalidPanelWidth;
+                  document.body.style.cursor = 'col-resize';
+                  document.body.style.userSelect = 'none';
+                }}
+                title="Drag to resize invalid timestamps"
+                style={{ position: 'absolute', left: -8, top: 0, bottom: 0, height: '100%', width: 12, zIndex: 9999, cursor: 'col-resize', background: 'linear-gradient(90deg, rgba(229,231,235,0.0), rgba(229,231,235,0.6))', pointerEvents: 'auto' }}
+              />
               <div className="px-3 pt-3 pb-1 text-xs font-semibold text-gray-700 flex items-center justify-between">
                 <span>Invalid Timestamps</span>
                 <div className="flex items-center gap-2">
@@ -2586,7 +2639,20 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
       )}
       {/* When Find or Notes is open, render Invalid Timestamps as a separate side panel */}
       {showInvalidList && (showFindReplace || showNotes) && (
-        <div className="flex h-full flex-col border-l bg-white" style={{ width: 320 }}>
+        <div className="flex h-full flex-col border-l bg-white relative" style={{ width: invalidPanelWidth }}>
+          <div
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              isResizingInvalidRef.current = true;
+              startXInvalidRef.current = e.clientX;
+              startWidthInvalidRef.current = invalidPanelWidth;
+              document.body.style.cursor = 'col-resize';
+              document.body.style.userSelect = 'none';
+            }}
+            title="Drag to resize invalid timestamps"
+            style={{ position: 'absolute', left: -8, top: 0, bottom: 0, width: 12, zIndex: 9999, cursor: 'col-resize', background: 'linear-gradient(90deg, rgba(229,231,235,0.0), rgba(229,231,235,0.6))', pointerEvents: 'auto' }}
+          />
           <div className="px-3 pt-3 pb-1 text-xs font-semibold text-gray-700 flex items-center justify-between">
             <span>Invalid Timestamps</span>
             <div className="flex items-center gap-2">
