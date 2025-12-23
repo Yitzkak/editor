@@ -55,6 +55,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
   const startWidthRef = useRef(320);
 
   const suggestionsRef = useRef(suggestions);
+  const suggestionTriggerRef = useRef(false);
   const virtualCursorsRef = useRef([]);
   const cursorOverlayRef = useRef(null);
   const formattedRangesRef = useRef([]);
@@ -287,6 +288,12 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     const quill = quillInstanceRef.current;
     const range = quill.getSelection();
     if (!range) return;
+    // Only show suggestions if the user recently typed or pasted — avoid showing on mouse clicks
+    if (!suggestionTriggerRef.current) {
+      setSuggestions([]);
+      setCurrentInput('');
+      return;
+    }
     const textBeforeCursor = quill.getText(0, range.index);
     // Use word boundary detection to find the current word being typed
     const match = textBeforeCursor.match(/\b\w*$/);
@@ -1319,6 +1326,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
       theme: 'bubble',
       modules: {
         toolbar: false, // Disable the toolbar
+        history: { delay: 1000, maxStack: 200, userOnly: true },
       },
       keyboard: {},
       placeholder: 'Start typing your transcription here...',
@@ -1339,6 +1347,25 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
 
     // Assign the Quill instance to the ref
     quillInstanceRef.current = quill;
+    // Ensure undo/redo keyboard shortcuts work even if keyboard config is minimal
+    try {
+      // Ctrl/Cmd+Z => undo
+      quill.keyboard.addBinding({ key: 'z', shortKey: true }, function(range, context) {
+        try { quill.history.undo(); } catch (e) {}
+        return false;
+      });
+      // Ctrl/Cmd+Shift+Z or Ctrl+Y => redo
+      quill.keyboard.addBinding({ key: 'z', shortKey: true, shiftKey: true }, function() {
+        try { quill.history.redo(); } catch (e) {}
+        return false;
+      });
+      quill.keyboard.addBinding({ key: 'y', shortKey: true }, function() {
+        try { quill.history.redo(); } catch (e) {}
+        return false;
+      });
+    } catch (e) {
+      // ignore if keyboard module isn't available
+    }
     let validateDebounce = null;
     quill.focus(); // Ensure the editor is focused for typing
     let lastHighlightedRange = null; // Store last highlighted range
@@ -1360,6 +1387,12 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     };
 
     const handleKeyDown = (event) => {
+      // Mark suggestion trigger on printable key presses so clicks don't open suggestions
+      try {
+        if (!event.ctrlKey && !event.metaKey && !event.altKey && event.key && event.key.length === 1) {
+          suggestionTriggerRef.current = true;
+        }
+      } catch (e) {}
       if (suggestionsRef.current?.length > 0) {
         if (event.key === 'ArrowDown') {
           event.preventDefault();
@@ -1606,51 +1639,23 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     // quill.on('selection-change', handleSelectionChange);
     quill.root.addEventListener('click', handleEditorClick);
     quill.root.addEventListener('keydown', handleKeyDown);
+    // Listen for paste events to trigger suggestions
+    quill.root.addEventListener('paste', (e) => {
+      suggestionTriggerRef.current = true;
+    });
     quill.root.addEventListener('contextmenu', handleEditorRightClick);
 
     quill.on('text-change', () => {
       handleTextChange();
       const range = quill.getSelection();
       if (range) {
-        const textBeforeCursor = quill.getText(0, range.index);
-        // Use word boundary detection to find the current word being typed
-        const match = textBeforeCursor.match(/\b\w*$/);
-        const prefix = match ? match[0] : '';
-        setCurrentInput(prefix);
-        let allSuggestions = [];
-        let displayToOriginal = {};
-        if (autosuggestionEnabled) {
-          const result = getWordsFromTranscript();
-          allSuggestions = result.suggestions;
-          displayToOriginal = result.displayToOriginal;
-        } else {
-          allSuggestions = predefinedWords;
-          predefinedWords.forEach(phrase => {
-            displayToOriginal[phrase] = phrase;
-          });
-        }
-        if (prefix.length >= 3) {
-          const fuse = new Fuse(allSuggestions, {
-            includeScore: true,
-            threshold: 0.4,
-            minMatchCharLength: 2,
-          });
-          const results = fuse.search(prefix);
-          const possibleSuggestions = Array.from(new Set(results.map(r => r.item)));
-          setSuggestions(possibleSuggestions);
-          handleTextChange.displayToOriginal = displayToOriginal;
-          if (possibleSuggestions.length > 0) {
-            const cursorBounds = quill.getBounds(range.index);
-            setSuggestionPosition({ top: cursorBounds.top + 30, left: cursorBounds.left });
-          }
-        } else {
-          setSuggestions([]); // Clear suggestions
-        }
         // If in multi-edit mode, refresh overlay positions
         if (virtualCursorsRef.current && virtualCursorsRef.current.length > 0) {
           try { renderCursorOverlay(); } catch (e) {}
         }
       }
+      // Reset suggestion trigger after processing input
+      suggestionTriggerRef.current = false;
     });
 
     // Set fixed height and custom font
