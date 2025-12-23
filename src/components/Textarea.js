@@ -2511,7 +2511,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
               </div>
             </div>
           )}
-          {showInvalidList && (
+          {showInvalidList && !(showFindReplace || showNotes) && (
             <div className="flex flex-col" style={{ width: '100%' }}>
               <div className="px-3 pt-3 pb-1 text-xs font-semibold text-gray-700 flex items-center justify-between">
                 <span>Invalid Timestamps</span>
@@ -2582,6 +2582,50 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
               </div>
             </div>
           )}
+        </div>
+      )}
+      {/* When Find or Notes is open, render Invalid Timestamps as a separate side panel */}
+      {showInvalidList && (showFindReplace || showNotes) && (
+        <div className="flex h-full flex-col border-l bg-white" style={{ width: 320 }}>
+          <div className="px-3 pt-3 pb-1 text-xs font-semibold text-gray-700 flex items-center justify-between">
+            <span>Invalid Timestamps</span>
+            <div className="flex items-center gap-2">
+              <button
+                className="w-8 h-8 flex items-center justify-center rounded-lg shadow bg-white text-yellow-700 hover:bg-yellow-50"
+                title="Previous invalid timestamp"
+                onClick={goToPrevInvalid}
+              >
+                <svg className="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 4L6 10l6 6"/></svg>
+              </button>
+              <div className="text-xs text-gray-600">{currentInvalidIndex + 1}/{invalidTimestampCount}</div>
+              <button
+                className="w-8 h-8 flex items-center justify-center rounded-lg shadow bg-white text-yellow-700 hover:bg-yellow-50"
+                title="Next invalid timestamp"
+                onClick={goToNextInvalid}
+              >
+                <svg className="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 4l6 6-6 6"/></svg>
+              </button>
+            </div>
+          </div>
+          <div className="flex-1 p-3 space-y-2" style={{ maxHeight: invalidPanelMaxHeight + 'px', overflowY: 'auto' }}>
+            {timestampInvalidsRef.current && timestampInvalidsRef.current.length > 0 ? (
+              timestampInvalidsRef.current.map((it, i) => (
+                <div key={i} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded">
+                  <div className="text-sm text-gray-800">{it.text}</div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      className="text-xs px-2 py-1 bg-indigo-50 text-indigo-700 rounded"
+                      onClick={() => { goToInvalidAt(i); }}
+                    >
+                      Go
+                    </button>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-sm text-gray-500">No invalid timestamps</div>
+            )}
+          </div>
         </div>
       )}
       
