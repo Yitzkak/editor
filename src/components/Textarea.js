@@ -55,8 +55,17 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
   const startWidthRef = useRef(320);
 
   const suggestionsRef = useRef(suggestions);
+  const virtualCursorsRef = useRef([]);
+  const cursorOverlayRef = useRef(null);
+  const formattedRangesRef = useRef([]);
   const [timestampIndex, setTimestampIndex] = useState([]);
   const [onTimestampClick, setOnTimestampClick] = useState(null);
+  const timestampHighlightsRef = useRef([]);
+  const [invalidTimestampCount, setInvalidTimestampCount] = useState(0);
+  const [currentInvalidIndex, setCurrentInvalidIndex] = useState(0);
+  const timestampInvalidsRef = useRef([]);
+  const [showInvalidList, setShowInvalidList] = useState(false);
+  const [invalidPanelMaxHeight, setInvalidPanelMaxHeight] = useState(400);
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState({
@@ -136,6 +145,10 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
   const [caseSensitive, setCaseSensitive] = useState(false);
   const [wholeWord, setWholeWord] = useState(true);
   const [showHighlightRepeated, setShowHighlightRepeated] = useState(false);
+  const repeatedPositionsRef = useRef([]); // stores { index, length }
+  const [currentRepeatedIndex, setCurrentRepeatedIndex] = useState(0);
+  const [replaceMode, setReplaceMode] = useState(null); // { selectedText, range } or null
+  const replaceInputRef = useRef('');
 
   // Function to capitalize all letters
   const formatUppercase = () => {
@@ -353,6 +366,8 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
           const cursorPos = range.index + formattedTimestamp.length;
           quillInstanceRef.current.setSelection(cursorPos);
         }
+        // After insertion, validate timestamps order and highlight any out-of-order timestamps
+        setTimeout(() => validateAllTimestamps(), 50);
     }
   };
 
@@ -365,6 +380,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     const formattedTimestamp = `${timestamp} ${speakerLabel}: `;
     quill.insertText(range.index, formattedTimestamp);
     quill.setSelection(range.index + formattedTimestamp.length);
+    setTimeout(() => validateAllTimestamps(), 50);
   };
 
   // Split paragraph at cursor, insert timestamp, and move text after cursor to a new paragraph.
@@ -405,7 +421,119 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     // Position of 'S' is at: cursorIndex + 2 (for the two newlines) + timestamp.length + 1 (for space)
     const speakerNumberPos = cursorIndex + 2 + timestamp.length + 2; // +2 for " S"
     quill.setSelection(speakerNumberPos, 1); // Select just the digit
+    setTimeout(() => validateAllTimestamps(), 50);
   };
+
+  // Parse timestamp strings like H:MM:SS(.ms) or M:SS(.ms) into seconds
+  const parseTimestampToSeconds = (ts) => {
+    if (!ts || typeof ts !== 'string') return NaN;
+    const parts = ts.split(':').map(p => p.trim());
+    if (parts.length === 3) {
+      const h = parseFloat(parts[0]) || 0;
+      const m = parseFloat(parts[1]) || 0;
+      const s = parseFloat(parts[2]) || 0;
+      return h * 3600 + m * 60 + s;
+    } else if (parts.length === 2) {
+      const m = parseFloat(parts[0]) || 0;
+      const s = parseFloat(parts[1]) || 0;
+      return m * 60 + s;
+    } else if (parts.length === 1) {
+      return parseFloat(parts[0]) || 0;
+    }
+    return NaN;
+  };
+
+  // Find all timestamp occurrences in content. Returns array sorted by index.
+  const findAllTimestamps = (content) => {
+    const regex = /\b\d{1,2}:\d{1,2}:\d{1,2}(?:\.\d+)?\b|\b\d{1,2}:\d{1,2}(?:\.\d+)?\b/g;
+    const matches = [];
+    let m;
+    while ((m = regex.exec(content)) !== null) {
+      matches.push({ index: m.index, length: m[0].length, text: m[0], seconds: parseTimestampToSeconds(m[0]) });
+    }
+    return matches.sort((a, b) => a.index - b.index);
+  };
+
+  // Validate all timestamps and highlight any that break ascending order
+  const validateAllTimestamps = () => {
+    if (!quillInstanceRef.current) return;
+    const quill = quillInstanceRef.current;
+    const content = quill.getText();
+
+    // Clear previous timestamp-only highlights
+    try {
+      (timestampHighlightsRef.current || []).forEach(({ index, length }) => {
+        quill.formatText(index, length, { background: false });
+      });
+    } catch (e) {
+      // ignore
+    }
+    timestampHighlightsRef.current = [];
+
+    const timestamps = findAllTimestamps(content);
+    if (timestamps.length === 0) return;
+
+    const invalids = [];
+    for (let i = 0; i < timestamps.length; i++) {
+      const cur = timestamps[i];
+      const prev = timestamps[i - 1];
+      const next = timestamps[i + 1];
+      const curSec = cur.seconds;
+      let isInvalid = false;
+      if (prev && !(curSec > prev.seconds)) {
+        // not later than previous
+        isInvalid = true;
+      }
+      if (next && !(curSec < next.seconds)) {
+        // not before next
+        isInvalid = true;
+      }
+      if (isInvalid) invalids.push(cur);
+    }
+
+    // Apply highlight to invalid timestamps
+    invalids.forEach(({ index, length }) => {
+      try {
+        quill.formatText(index, length, { background: '#FFD54D' });
+        timestampHighlightsRef.current.push({ index, length });
+      } catch (e) {}
+    });
+
+    // Save invalid timestamp objects for listing/navigation
+    timestampInvalidsRef.current = invalids;
+
+    // Update UI state for navigation
+    setInvalidTimestampCount(invalids.length);
+    setCurrentInvalidIndex(invalids.length > 0 ? 0 : 0);
+  };
+
+  // Compute available height for invalid timestamps panel based on editor area
+  const computeInvalidPanelHeight = () => {
+    try {
+      const editorContainer = editorRef.current?.querySelector('.ql-editor');
+      if (editorContainer) {
+        // Reserve some space for headers/toolbars in the right column
+        const available = editorContainer.clientHeight - 80; // leave room for header
+        setInvalidPanelMaxHeight(Math.max(120, available));
+        return;
+      }
+    } catch (e) {
+      // ignore
+    }
+    setInvalidPanelMaxHeight(Math.max(120, window.innerHeight - 220));
+  };
+
+  useEffect(() => {
+    computeInvalidPanelHeight();
+    const onResize = () => computeInvalidPanelHeight();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  // Recompute when the invalid list panel is opened
+  useEffect(() => {
+    if (showInvalidList) computeInvalidPanelHeight();
+  }, [showInvalidList]);
 
   // Return true if the current selection is at the start of a paragraph/line
   const isCursorAtStartOfParagraph = () => {
@@ -785,6 +913,19 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     }
   }, [transcript]); // Only depend on transcript changes
 
+  // If highlights are enabled, re-run highlight pass when transcript changes
+  useEffect(() => {
+    if (showHighlightRepeated) {
+      // Re-apply highlights based on the latest transcript
+      highlightRepeatedSpeakers(true);
+    }
+  }, [transcript, showHighlightRepeated]);
+
+  // Always re-validate timestamps order when transcript changes
+  useEffect(() => {
+    validateAllTimestamps();
+  }, [transcript]);
+
   // Apply click handlers when onTimestampClick changes
   useEffect(() => {
     if (onTimestampClick && quillInstanceRef.current) {
@@ -816,10 +957,20 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     // Get all text from the editor
     const content = quillInstanceRef.current.getText();
     
-    // If we're removing highlight, just clear all background colors
+    // If we're removing highlight, clear only the previous repeated-speaker highlights
     if (!shouldHighlight) {
-      quillInstanceRef.current.formatText(0, content.length, { background: false });
-      console.log('[Textarea] Cleared all speaker highlights');
+      try {
+        (repeatedPositionsRef.current || []).forEach(({ index, length }) => {
+          quillInstanceRef.current.formatText(index, length, { background: false });
+        });
+      } catch (e) {
+        // ignore
+      }
+      repeatedPositionsRef.current = [];
+      setCurrentRepeatedIndex(0);
+      console.log('[Textarea] Cleared repeated speaker highlights');
+      // Re-validate timestamps to restore any timestamp highlights removed earlier
+      setTimeout(() => validateAllTimestamps(), 50);
       return;
     }
     
@@ -850,15 +1001,154 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
       return;
     }
     
-    // Clear any previous formatting first by removing all background colors
-    quillInstanceRef.current.formatText(0, content.length, { background: false });
+    // Clear any previous repeated-speaker highlights (preserve other highlights)
+    try {
+      (repeatedPositionsRef.current || []).forEach(({ index, length }) => {
+        quillInstanceRef.current.formatText(index, length, { background: false });
+      });
+    } catch (e) {
+      // ignore
+    }
     
     // Apply red highlight to repeated speakers
     positions.forEach(({ index, length }) => {
       quillInstanceRef.current.formatText(index, length, { background: '#FF6B6B' }); // Red highlight
     });
-    
+
+    // Save positions for navigation
+    repeatedPositionsRef.current = positions;
+    setCurrentRepeatedIndex(0);
+
     console.log(`[Textarea] Highlighted ${positions.length} repeated speaker(s)`);
+  };
+
+  // Navigate to a repeated speaker occurrence by ordinal index
+  const goToRepeatedAt = (ordinal) => {
+    const positions = repeatedPositionsRef.current || [];
+    if (!quillInstanceRef.current || positions.length === 0) return;
+    const idx = Math.max(0, Math.min(positions.length - 1, ordinal));
+    const { index, length } = positions[idx];
+    const quill = quillInstanceRef.current;
+
+    // Set selection at the speaker label
+    try {
+      quill.setSelection(index, length);
+    } catch (e) {
+      // ignore selection errors
+    }
+
+    // Scroll editor so the selected range is visible (center it)
+    const editorEl = editorRef.current; // container where Quill was mounted
+    const qEditor = editorEl?.querySelector('.ql-editor');
+    if (qEditor) {
+      const bounds = quill.getBounds(index, length);
+      const top = bounds.top + qEditor.scrollTop;
+      const center = Math.max(0, top - (qEditor.clientHeight / 2));
+
+      // Smooth scroll with a safe fallback for environments without behavior support
+      try {
+        if (typeof qEditor.scrollTo === 'function') {
+          qEditor.scrollTo({ top: center, behavior: 'smooth' });
+        } else if (typeof qEditor.scroll === 'function') {
+          qEditor.scroll({ top: center, behavior: 'smooth' });
+        } else {
+          // Fallback: animate via requestAnimationFrame
+          const start = qEditor.scrollTop;
+          const change = center - start;
+          const duration = 350;
+          let startTime = null;
+          const easeInOut = (t) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+          const animate = (timestamp) => {
+            if (!startTime) startTime = timestamp;
+            const elapsed = timestamp - startTime;
+            const progress = Math.min(1, elapsed / duration);
+            qEditor.scrollTop = start + change * easeInOut(progress);
+            if (progress < 1) requestAnimationFrame(animate);
+          };
+          requestAnimationFrame(animate);
+        }
+      } catch (e) {
+        // In case of any errors, fallback to instant scroll
+        qEditor.scrollTop = center;
+      }
+    }
+
+    setCurrentRepeatedIndex(idx);
+  };
+
+  const goToNextRepeated = () => {
+    const positions = repeatedPositionsRef.current || [];
+    if (positions.length === 0) return;
+    const next = (currentRepeatedIndex + 1) % positions.length;
+    goToRepeatedAt(next);
+  };
+
+  const goToPrevRepeated = () => {
+    const positions = repeatedPositionsRef.current || [];
+    if (positions.length === 0) return;
+    const prev = (currentRepeatedIndex - 1 + positions.length) % positions.length;
+    goToRepeatedAt(prev);
+  };
+
+  // Navigate to invalid timestamp occurrence by ordinal
+  const goToInvalidAt = (ordinal) => {
+    const positions = timestampHighlightsRef.current || [];
+    if (!quillInstanceRef.current || positions.length === 0) return;
+    const idx = Math.max(0, Math.min(positions.length - 1, ordinal));
+    const { index, length } = positions[idx];
+    const quill = quillInstanceRef.current;
+
+    try {
+      quill.setSelection(index, length);
+    } catch (e) {}
+
+    // Scroll into view using same smooth fallback
+    const editorEl = editorRef.current;
+    const qEditor = editorEl?.querySelector('.ql-editor');
+    if (qEditor) {
+      const bounds = quill.getBounds(index, length);
+      const top = bounds.top + qEditor.scrollTop;
+      const center = Math.max(0, top - (qEditor.clientHeight / 2));
+      try {
+        if (typeof qEditor.scrollTo === 'function') {
+          qEditor.scrollTo({ top: center, behavior: 'smooth' });
+        } else if (typeof qEditor.scroll === 'function') {
+          qEditor.scroll({ top: center, behavior: 'smooth' });
+        } else {
+          const start = qEditor.scrollTop;
+          const change = center - start;
+          const duration = 350;
+          let startTime = null;
+          const easeInOut = (t) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+          const animate = (timestamp) => {
+            if (!startTime) startTime = timestamp;
+            const elapsed = timestamp - startTime;
+            const progress = Math.min(1, elapsed / duration);
+            qEditor.scrollTop = start + change * easeInOut(progress);
+            if (progress < 1) requestAnimationFrame(animate);
+          };
+          requestAnimationFrame(animate);
+        }
+      } catch (e) {
+        qEditor.scrollTop = center;
+      }
+    }
+
+    setCurrentInvalidIndex(idx);
+  };
+
+  const goToNextInvalid = () => {
+    const positions = timestampHighlightsRef.current || [];
+    if (positions.length === 0) return;
+    const next = (currentInvalidIndex + 1) % positions.length;
+    goToInvalidAt(next);
+  };
+
+  const goToPrevInvalid = () => {
+    const positions = timestampHighlightsRef.current || [];
+    if (positions.length === 0) return;
+    const prev = (currentInvalidIndex - 1 + positions.length) % positions.length;
+    goToInvalidAt(prev);
   };
 
   // Expose the `insertTimestamp` method to the parent component
@@ -1009,6 +1299,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
 
     // Assign the Quill instance to the ref
     quillInstanceRef.current = quill;
+    let validateDebounce = null;
     quill.focus(); // Ensure the editor is focused for typing
     let lastHighlightedRange = null; // Store last highlighted range
 
@@ -1016,11 +1307,16 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     const handleEditorClick = () => {
       console.log('Clicked inside the editor');
       if (lastHighlightedRange) {
-        // Remove highlight when clicking inside the editor
-        // quill.formatText(lastHighlightedRange.index, lastHighlightedRange.length, { background: false });
         lastHighlightedRange = null; // Reset the stored range
       }
-      //setHighlightedText(""); // Reset highlighted text when clicking inside the editor
+      // If user clicks while in multi-edit mode (check ref), exit multi-edit mode
+      if (virtualCursorsRef.current && virtualCursorsRef.current.length > 0) {
+        virtualCursorsRef.current = [];
+        setReplaceMode(null);
+        try { clearCursorOverlay(); } catch (e) {}
+        try { clearHighlightedRanges(); } catch (e) {}
+        console.log('[Textarea] Exited multi-edit mode due to click');
+      }
     };
 
     const handleKeyDown = (event) => {
@@ -1036,6 +1332,71 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
           event.stopPropagation();
           const suggestion = suggestionsRef.current[selectedSuggestionIndex] || suggestionsRef.current[0];
           insertSuggestionAtContext(suggestion);
+        }
+      }
+      // If we're in multi-edit mode, handle typing/paste/backspace/delete here
+      else if (virtualCursorsRef.current && virtualCursorsRef.current.length > 0) {
+        // ESC to exit
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          // Clear multi-edit state and visual cues
+          virtualCursorsRef.current = [];
+          setReplaceMode(null);
+          try { clearCursorOverlay(); } catch (e) {}
+          try { clearHighlightedRanges(); } catch (e) {}
+          console.log('[Textarea] Multi-edit mode exited via Escape');
+          return;
+        }
+
+        // Handle printable characters
+        if (!event.ctrlKey && !event.metaKey && !event.altKey && event.key.length === 1) {
+          event.preventDefault();
+          const insertText = event.key;
+          performMultiEdit({ op: 'insert', text: insertText });
+          return;
+        }
+
+        // Handle Backspace/Delete
+        if (event.key === 'Backspace') {
+          event.preventDefault();
+          performMultiEdit({ op: 'backspace' });
+          return;
+        }
+        if (event.key === 'Delete') {
+          event.preventDefault();
+          performMultiEdit({ op: 'delete' });
+          return;
+        }
+      }
+      else if (event.ctrlKey && event.key === 'k') {
+        // Ctrl+K: Start multi-edit mode with highlighted text
+        event.preventDefault();
+        const sel = quill.getSelection();
+        if (sel && sel.length > 0) {
+          const selectedText = quill.getText(sel.index, sel.length);
+          const content = quill.getText();
+          const escapedText = selectedText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const regex = new RegExp(`\\b${escapedText}\\b`, 'g');
+          const matches = [...content.matchAll(regex)];
+          if (matches.length === 0) {
+            alert('No matches found for the selected term.');
+            return;
+          }
+
+          // Build virtual cursors from matches (scan once)
+          // Each cursor tracks its insertion offset and whether it has been replaced yet
+          const cursors = matches.map(m => ({ start: m.index, length: m[0].length, offset: 0, replaced: false }));
+          virtualCursorsRef.current = cursors;
+          setReplaceMode({ selectedText });
+          replaceInputRef.current = '';
+          console.log(`[Textarea] Multi-edit mode started for "${selectedText}", ${cursors.length} cursors created`);
+
+          // Optionally select first occurrence to show user position
+          const first = cursors[0];
+          quill.setSelection(first.start, first.length);
+          // Render visual cues (carets + highlights)
+          try { highlightCursorsRanges(); } catch (e) {}
+          try { renderCursorOverlay(); } catch (e) {}
         }
       }
       else if (event.altKey && event.key === 's') {
@@ -1055,6 +1416,151 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
           formatSelectionTitleCase();
         }
       }
+    };
+
+    // Paste handler for multi-edit mode
+    const handlePaste = (evt) => {
+      if (!virtualCursorsRef.current || virtualCursorsRef.current.length === 0) return;
+      evt.preventDefault();
+      const pasted = (evt.clipboardData || window.clipboardData).getData('text');
+      if (pasted && pasted.length > 0) {
+        performMultiEdit({ op: 'insert', text: pasted });
+      }
+    };
+
+    // Perform multi-edit replacement across virtual cursors
+    const performMultiEdit = (cmd) => {
+      const quill = quillInstanceRef.current;
+      const cursors = virtualCursorsRef.current || [];
+      if (!quill || !cursors.length) return;
+
+      // Normalize command
+      let op = 'insert';
+      let text = '';
+      if (typeof cmd === 'string') {
+        op = 'insert';
+        text = cmd;
+      } else if (cmd && typeof cmd === 'object') {
+        op = cmd.op || 'insert';
+        text = cmd.text || '';
+      }
+
+      // Apply edits from last to first to avoid index shift issues
+      for (let i = cursors.length - 1; i >= 0; i--) {
+        const c = cursors[i];
+
+        if (op === 'insert') {
+          if (!c.replaced && c.length > 0) {
+            // First insertion: replace the original matched text
+            quill.deleteText(c.start, c.length);
+            if (text.length > 0) quill.insertText(c.start, text);
+            c.offset = text.length;
+            c.length = text.length;
+            c.replaced = true;
+          } else {
+            // Subsequent insertions: insert at current offset
+            const insertPos = c.start + c.offset;
+            if (text.length > 0) quill.insertText(insertPos, text);
+            c.offset += text.length;
+            c.length += text.length;
+          }
+        } else if (op === 'backspace') {
+          if (!c.replaced && c.length > 0) {
+            // If not replaced yet, remove the original selection entirely
+            quill.deleteText(c.start, c.length);
+            c.offset = 0;
+            c.length = 0;
+            c.replaced = true;
+          } else if (c.replaced && c.offset > 0) {
+            // Delete char before current insertion point
+            const delPos = c.start + c.offset - 1;
+            quill.deleteText(delPos, 1);
+            c.offset -= 1;
+            c.length -= 1;
+          }
+        } else if (op === 'delete') {
+          if (!c.replaced && c.length > 0) {
+            // If not replaced yet, remove the original selection entirely
+            quill.deleteText(c.start, c.length);
+            c.offset = 0;
+            c.length = 0;
+            c.replaced = true;
+          } else if (c.replaced) {
+            // Delete char at current insertion point
+            const delPos = c.start + c.offset;
+            quill.deleteText(delPos, 1);
+            // length reduced but offset remains
+            c.length = Math.max(0, c.length - 1);
+          }
+        }
+      }
+
+      // After edits, keep multi-edit mode active and update cursors in place
+      virtualCursorsRef.current = cursors;
+      // Set caret to first edited occurrence for user feedback
+      const first = cursors[0];
+      const caretPos = first.start + first.offset;
+      quill.setSelection(caretPos, 0);
+      try { renderCursorOverlay(); } catch (e) {}
+    };
+
+    // Render visual caret markers for each virtual cursor into the overlay
+    const renderCursorOverlay = () => {
+      const overlay = cursorOverlayRef.current;
+      if (!overlay || !quill) return;
+      overlay.innerHTML = '';
+      const cursors = virtualCursorsRef.current || [];
+      cursors.forEach((c, idx) => {
+        try {
+          const pos = c.start + (c.offset || 0);
+          const bounds = quill.getBounds(pos);
+          const caret = document.createElement('div');
+          caret.className = 'multi-caret-marker';
+          // style the caret: thin blue line with small top offset
+          caret.style.position = 'absolute';
+          caret.style.width = '2px';
+          caret.style.background = '#2563EB';
+          caret.style.left = `${bounds.left}px`;
+          caret.style.top = `${bounds.top}px`;
+          caret.style.height = `${Math.max(16, bounds.height)}px`;
+          caret.style.pointerEvents = 'none';
+          caret.style.zIndex = 50;
+          // Optionally add a small label with index for debugging
+          caret.setAttribute('data-cursor-index', String(idx + 1));
+          overlay.appendChild(caret);
+        } catch (e) {
+          // ignore bounds errors
+        }
+      });
+    };
+
+    const clearCursorOverlay = () => {
+      const overlay = cursorOverlayRef.current;
+      if (overlay) overlay.innerHTML = '';
+    };
+
+    const highlightCursorsRanges = () => {
+      if (!quill) return;
+      const cursors = virtualCursorsRef.current || [];
+      formattedRangesRef.current = [];
+      cursors.forEach(c => {
+        try {
+          // apply a light background to each matched range (or inserted text)
+          const len = Math.max(1, c.length || 0);
+          quill.formatText(c.start, len, { background: '#FFF59D' });
+          formattedRangesRef.current.push({ start: c.start, length: len });
+        } catch (e) {}
+      });
+    };
+
+    const clearHighlightedRanges = () => {
+      if (!quill) return;
+      // Attempt to clear backgrounds for ranges we recorded
+      const ranges = formattedRangesRef.current || [];
+      ranges.forEach(r => {
+        try { quill.formatText(r.start, Math.max(1, r.length), { background: false }); } catch (e) {}
+      });
+      formattedRangesRef.current = [];
     };
 
     // quill.on('selection-change', handleSelectionChange);
@@ -1100,6 +1606,10 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
         } else {
           setSuggestions([]); // Clear suggestions
         }
+        // If in multi-edit mode, refresh overlay positions
+        if (virtualCursorsRef.current && virtualCursorsRef.current.length > 0) {
+          try { renderCursorOverlay(); } catch (e) {}
+        }
       }
     });
 
@@ -1130,6 +1640,8 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     const savedTranscript = localStorage.getItem('transcript');
     if (savedTranscript) {
       quill.root.innerHTML = savedTranscript; // Load the saved transcript into Quill
+      // Run timestamp validation after loading content
+      setTimeout(() => validateAllTimestamps(), 50);
     }
 
     // Handle non-breaking spaces and replace with regular spaces
@@ -1146,6 +1658,11 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
 
       // Save the content to localStorage
       localStorage.setItem('transcript', updatedContent); // Save the content to localStorage
+      // Debounced validation to handle large pastes/rapid changes
+      try { if (validateDebounce) clearTimeout(validateDebounce); } catch (e) {}
+      validateDebounce = setTimeout(() => {
+        try { validateAllTimestamps(); } catch (e) {}
+      }, 250);
     });
 
     // Handle text selection
@@ -1176,6 +1693,17 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     }, 60000); // 60,000 ms = 1 minute
     return () => clearInterval(interval);
   }, []);
+
+  // Handle Ctrl+K replace mode: replace all occurrences as user types
+  useEffect(() => {
+    if (!replaceMode || !quillInstanceRef.current) return;
+
+    const { selectedText } = replaceMode;
+
+    // Handle text input during replace mode
+    // Removed previous replace-on-type behavior; multi-edit is handled inline in keydown/paste handlers
+    return;
+  }, [replaceMode]);
 
   // Attach right-click handler only once on mount
   useEffect(() => {
@@ -1522,6 +2050,12 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
             className="flex-1 min-w-0 font-monox bg-white rounded-md h-full break-words word-space-2 whitespace-pre-wrap"
             title="Right-click on timestamps (like '0:00:36.4 S2:') to play audio from that point"
           ></div>
+          {/* Overlay for rendering multi-cursor carets */}
+          <div
+            ref={cursorOverlayRef}
+            className="pointer-events-none"
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+          />
           {/* Speaker snippets panel (conditionally shown) */}
           {showSpeakerSnippets && (
             <React.Fragment>
@@ -1878,7 +2412,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
         </div>
       )}
       </div>
-      {(showFindReplace || showNotes) && (
+      {(showFindReplace || showNotes || showInvalidList) && (
         <div
           className="flex h-full flex-col border-l bg-white"
           style={{ width: stackedPanelWidth || undefined }}
@@ -1977,6 +2511,49 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
               </div>
             </div>
           )}
+          {showInvalidList && (
+            <div className="flex flex-col" style={{ width: '100%' }}>
+              <div className="px-3 pt-3 pb-1 text-xs font-semibold text-gray-700 flex items-center justify-between">
+                <span>Invalid Timestamps</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    className="w-8 h-8 flex items-center justify-center rounded-lg shadow bg-white text-yellow-700 hover:bg-yellow-50"
+                    title="Previous invalid timestamp"
+                    onClick={goToPrevInvalid}
+                  >
+                    <svg className="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 4L6 10l6 6"/></svg>
+                  </button>
+                  <div className="text-xs text-gray-600">{currentInvalidIndex + 1}/{invalidTimestampCount}</div>
+                  <button
+                    className="w-8 h-8 flex items-center justify-center rounded-lg shadow bg-white text-yellow-700 hover:bg-yellow-50"
+                    title="Next invalid timestamp"
+                    onClick={goToNextInvalid}
+                  >
+                    <svg className="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 4l6 6-6 6"/></svg>
+                  </button>
+                </div>
+              </div>
+              <div className="flex-1 p-3 space-y-2" style={{ maxHeight: invalidPanelMaxHeight + 'px', overflowY: 'auto' }}>
+                {timestampInvalidsRef.current && timestampInvalidsRef.current.length > 0 ? (
+                  timestampInvalidsRef.current.map((it, i) => (
+                    <div key={i} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded">
+                      <div className="text-sm text-gray-800">{it.text}</div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          className="text-xs px-2 py-1 bg-indigo-50 text-indigo-700 rounded"
+                          onClick={() => { goToInvalidAt(i); }}
+                        >
+                          Go
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-sm text-gray-500">No invalid timestamps</div>
+                )}
+              </div>
+            </div>
+          )}
           {showNotes && (
             <div className="flex h-full border-t">
               {/* Resize handle */}
@@ -2020,20 +2597,64 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
           </svg>
         </button>
         {/* Highlight repeated speakers button (placed with snippets) */}
-        <button
-          className={`w-8 h-8 flex items-center justify-center rounded-lg shadow transition-colors ${showHighlightRepeated ? 'bg-indigo-500 text-white' : 'bg-white text-indigo-500 hover:bg-indigo-100'}`}
-          title="Highlight Repeated Speakers"
-          onClick={() => {
-            const newState = !showHighlightRepeated;
-            setShowHighlightRepeated(newState);
-            highlightRepeatedSpeakers(newState);
-          }}
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-            <path d="M3 10h4v11H3zM9 3h4v18H9zM15 7h4v14h-4z" />
-          </svg>
-        </button>
-        {/* Notes toggle */}
+        <div className="flex items-center space-x-2">
+          <button
+            className={`w-8 h-8 flex items-center justify-center rounded-lg shadow transition-colors ${showHighlightRepeated ? 'bg-indigo-500 text-white' : 'bg-white text-indigo-500 hover:bg-indigo-100'}`}
+            title="Highlight Repeated Speakers"
+            onClick={() => {
+              const newState = !showHighlightRepeated;
+              setShowHighlightRepeated(newState);
+              highlightRepeatedSpeakers(newState);
+            }}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path d="M3 10h4v11H3zM9 3h4v18H9zM15 7h4v14h-4z" />
+            </svg>
+          </button>
+
+          {/* Prev/Next controls shown when highlights active */}
+          {showHighlightRepeated && (repeatedPositionsRef.current?.length || 0) > 0 && (
+            <>
+              <button
+                className="w-8 h-8 flex items-center justify-center rounded-lg shadow bg-white text-indigo-500 hover:bg-indigo-100"
+                title="Previous repeated speaker"
+                onClick={goToPrevRepeated}
+              >
+                <svg className="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 4L6 10l6 6"/></svg>
+              </button>
+              <button
+                className="w-8 h-8 flex items-center justify-center rounded-lg shadow bg-white text-indigo-500 hover:bg-indigo-100"
+                title="Next repeated speaker"
+                onClick={goToNextRepeated}
+              >
+                <svg className="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 4l6 6-6 6"/></svg>
+              </button>
+            </>
+          )}
+          {/* Invalid timestamp navigation controls moved to vertical column */}
+        </div>
+          {/* Invalid timestamps list button (vertical group) */}
+          <div className="relative flex items-center">
+            <div className="relative">
+              <button
+                className={`w-8 h-8 flex items-center justify-center rounded-lg shadow transition-colors ${showInvalidList ? 'bg-indigo-500 text-white' : 'bg-white text-indigo-500 hover:bg-indigo-100'}`}
+                title="Invalid Timestamps"
+                onClick={() => setShowInvalidList(v => !v)}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path d="M3 6h18M3 12h18M3 18h18" />
+                </svg>
+                {invalidTimestampCount > 0 && (
+                  <span className="absolute -top-1 -right-1 inline-flex items-center justify-center w-5 h-5 text-[10px] font-semibold text-white bg-yellow-600 rounded-full">{invalidTimestampCount}</span>
+                )}
+              </button>
+            </div>
+
+            {/* inline prev/next removed — controls live in right-side panel */}
+
+            {/* dropdown removed — invalid list now opens in the right-side panel */}
+          </div>
+          {/* Notes toggle */}
         <button
           className={`w-8 h-8 flex items-center justify-center rounded-lg shadow transition-colors ${showNotes ? 'bg-indigo-500 text-white' : 'bg-white text-indigo-500 hover:bg-indigo-100'}`}
           title="Notes"
