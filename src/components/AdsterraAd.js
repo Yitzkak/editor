@@ -15,7 +15,6 @@ import React, { useEffect, useRef } from 'react';
  */
 const AdsterraAd = ({ adId, format = 'banner', className = '' }) => {
   const adRef = useRef(null);
-  const scriptLoadedRef = useRef(false);
 
   useEffect(() => {
     // Check if ads are enabled via environment variable
@@ -25,8 +24,10 @@ const AdsterraAd = ({ adId, format = 'banner', className = '' }) => {
       return;
     }
 
-    // Prevent loading the same script multiple times
-    if (scriptLoadedRef.current) {
+    // Validate adId to prevent XSS - should only contain alphanumeric characters and underscores
+    const adIdPattern = /^[a-zA-Z0-9_-]+$/;
+    if (!adIdPattern.test(adId)) {
+      console.error('Invalid Adsterra ad ID format. Ad ID should only contain alphanumeric characters, hyphens, and underscores.');
       return;
     }
 
@@ -51,13 +52,12 @@ const AdsterraAd = ({ adId, format = 'banner', className = '' }) => {
           
           const invokeScript = document.createElement('script');
           invokeScript.type = 'text/javascript';
-          invokeScript.src = `//www.highperformanceformat.com/${adId}/invoke.js`;
+          invokeScript.src = `https://www.highperformanceformat.com/${adId}/invoke.js`;
           invokeScript.async = true;
           
           if (adRef.current) {
             adRef.current.appendChild(script);
             adRef.current.appendChild(invokeScript);
-            scriptLoadedRef.current = true;
           }
         } 
         // For popunder ads
@@ -66,11 +66,10 @@ const AdsterraAd = ({ adId, format = 'banner', className = '' }) => {
           script.type = 'text/javascript';
           script.async = true;
           script.setAttribute('data-cfasync', 'false');
-          script.src = `//www.highperformancedisplayformat.com/${adId}/invoke.js`;
+          script.src = `https://www.highperformancedisplayformat.com/${adId}/invoke.js`;
           
           if (adRef.current) {
             adRef.current.appendChild(script);
-            scriptLoadedRef.current = true;
           }
         }
       } catch (error) {
@@ -89,7 +88,6 @@ const AdsterraAd = ({ adId, format = 'banner', className = '' }) => {
           adRef.current.removeChild(adRef.current.firstChild);
         }
       }
-      scriptLoadedRef.current = false;
     };
   }, [adId, format]);
 
