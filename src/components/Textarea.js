@@ -546,6 +546,72 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     }, delay);
   };
 
+  // Validate only timestamps in the viewport (for continuous validation when toggle is on)
+  const validateViewportTimestamps = () => {
+    if (!quillInstanceRef.current) return;
+    const quill = quillInstanceRef.current;
+    const content = quill.getText();
+
+    // Clear previous timestamp-only highlights
+    clearTimestampHighlights();
+
+    const timestamps = findAllTimestamps(content);
+    if (timestamps.length === 0) return;
+
+    // Restrict to visible viewport only
+    let visibleTimestamps = timestamps;
+    try {
+      const editorContainer = editorRef.current?.querySelector('.ql-editor');
+      if (editorContainer) {
+        const viewportTop = editorContainer.scrollTop;
+        const viewportBottom = viewportTop + editorContainer.clientHeight;
+        visibleTimestamps = timestamps.filter(t => {
+          const bounds = quill.getBounds(t.index, t.length);
+          if (!bounds) return false;
+          const bTop = bounds.top + viewportTop;
+          const bBottom = bTop + bounds.height;
+          return bTop < viewportBottom + 200 && bBottom > viewportTop - 200; // buffer for smooth scrolling
+        });
+      }
+    } catch (e) {
+      // fallback to all timestamps
+    }
+
+    const invalids = [];
+    for (let i = 0; i < visibleTimestamps.length; i++) {
+      const cur = visibleTimestamps[i];
+      const prev = visibleTimestamps[i - 1];
+      const next = visibleTimestamps[i + 1];
+      const curSec = cur.seconds;
+      let isInvalid = false;
+      if (prev && !(curSec > prev.seconds)) {
+        isInvalid = true;
+      }
+      if (next && !(curSec < next.seconds)) {
+        isInvalid = true;
+      }
+      if (isInvalid) invalids.push(cur);
+    }
+
+    // Apply highlight to viewport invalid timestamps only
+    invalids.forEach(({ index, length }) => {
+      try {
+        quill.formatText(index, length, { background: '#FFD54D' });
+        timestampHighlightsRef.current.push({ index, length });
+      } catch (e) {}
+    });
+  };
+
+  const scheduleValidateViewportTimestamps = (delay = 200) => {
+    if (validateTimerRef.current) {
+      clearTimeout(validateTimerRef.current);
+    }
+    validateTimerRef.current = setTimeout(() => {
+      validateTimerRef.current = null;
+      validateViewportTimestamps();
+    }, delay);
+  };
+
   // Compute available height for invalid timestamps panel based on editor area
   const computeInvalidPanelHeight = () => {
     try {
@@ -960,12 +1026,31 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     }
   }, [transcript, showHighlightRepeated]);
 
-  // Remove continuous validation - only validate when button is clicked
-  // useEffect(() => {
-  //   if (validateTimestampsEnabled) {
-  //     scheduleValidateAllTimestamps(200);
-  //   }
-  // }, [transcript, validateTimestampsEnabled]);
+  // Continuous viewport validation when toggle is enabled
+  useEffect(() => {
+    if (validateTimestampsEnabled) {
+      scheduleValidateViewportTimestamps(200);
+    } else {
+      clearTimestampHighlights();
+    }
+  }, [transcript, validateTimestampsEnabled]);
+
+  // Add scroll listener for viewport validation
+  useEffect(() => {
+    if (!validateTimestampsEnabled) return;
+    
+    const editorContainer = editorRef.current?.querySelector('.ql-editor');
+    if (!editorContainer) return;
+
+    const handleScroll = () => {
+      scheduleValidateViewportTimestamps(150);
+    };
+
+    editorContainer.addEventListener('scroll', handleScroll);
+    return () => {
+      editorContainer.removeEventListener('scroll', handleScroll);
+    };
+  }, [validateTimestampsEnabled]);
 
   // Apply click handlers when onTimestampClick changes
   useEffect(() => {
@@ -2800,19 +2885,18 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
 
             {/* dropdown removed — invalid list now opens in the right-side panel */}
           </div>
-          {/* Build invalid timestamp list */}
+          {/* Toggle viewport validation */}
           <button
             className={`w-8 h-8 flex items-center justify-center rounded-lg shadow transition-colors ${validateTimestampsEnabled ? 'bg-green-500 text-white' : 'bg-white text-gray-500 hover:bg-gray-100'}`}
-            title="Find invalid timestamps (click once to build list)"
+            title="Toggle viewport timestamp validation"
             onClick={() => {
-              // Toggle validation state for visual feedback
               setValidateTimestampsEnabled((prev) => {
                 const next = !prev;
                 if (next) {
-                  // Build the list once when clicked
-                  validateAllTimestamps();
+                  // Enable continuous viewport validation
+                  scheduleValidateViewportTimestamps(0);
                 } else {
-                  // Clear highlights when clicked again
+                  // Clear highlights when disabled
                   clearTimestampHighlights();
                 }
                 return next;
