@@ -35,28 +35,31 @@ const AdsterraAd = ({ adId, format = 'banner', className = '' }) => {
       try {
         // For banner and native ads
         if (format === 'banner' || format === 'native') {
-          const script = document.createElement('script');
-          script.type = 'text/javascript';
-          script.async = true;
+          // Create configuration script using textContent for safety
+          const configScript = document.createElement('script');
+          configScript.type = 'text/javascript';
+          configScript.async = true;
           
-          // Adsterra ad script configuration
-          script.innerHTML = `
-            atOptions = {
-              'key' : '${adId}',
-              'format' : 'iframe',
-              'height' : ${format === 'banner' ? 90 : 250},
-              'width' : ${format === 'banner' ? 728 : 300},
-              'params' : {}
-            };
-          `;
+          // Build configuration safely using textContent
+          const config = {
+            key: adId,
+            format: 'iframe',
+            height: format === 'banner' ? 90 : 250,
+            width: format === 'banner' ? 728 : 300,
+            params: {}
+          };
+          configScript.textContent = `atOptions = ${JSON.stringify(config)};`;
           
+          // Create invoke script with validated URL
           const invokeScript = document.createElement('script');
           invokeScript.type = 'text/javascript';
-          invokeScript.src = `https://www.highperformanceformat.com/${adId}/invoke.js`;
           invokeScript.async = true;
+          // Safely construct URL with validated adId
+          const invokeUrl = `https://www.highperformanceformat.com/${encodeURIComponent(adId)}/invoke.js`;
+          invokeScript.src = invokeUrl;
           
           if (adRef.current) {
-            adRef.current.appendChild(script);
+            adRef.current.appendChild(configScript);
             adRef.current.appendChild(invokeScript);
           }
         } 
@@ -66,7 +69,9 @@ const AdsterraAd = ({ adId, format = 'banner', className = '' }) => {
           script.type = 'text/javascript';
           script.async = true;
           script.setAttribute('data-cfasync', 'false');
-          script.src = `https://www.highperformancedisplayformat.com/${adId}/invoke.js`;
+          // Safely construct URL with validated adId
+          const popunderUrl = `https://www.highperformancedisplayformat.com/${encodeURIComponent(adId)}/invoke.js`;
+          script.src = popunderUrl;
           
           if (adRef.current) {
             adRef.current.appendChild(script);
@@ -82,11 +87,9 @@ const AdsterraAd = ({ adId, format = 'banner', className = '' }) => {
 
     return () => {
       clearTimeout(timer);
-      // Cleanup: Remove scripts when component unmounts
+      // Cleanup: Remove all scripts when component unmounts
       if (adRef.current) {
-        while (adRef.current.firstChild) {
-          adRef.current.removeChild(adRef.current.firstChild);
-        }
+        adRef.current.replaceChildren();
       }
     };
   }, [adId, format]);
