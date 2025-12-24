@@ -375,7 +375,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
         const formattedTimestamp = isStartOfParagraph ? `${timestamp} ${speakerLabel}: ` : `[${timestamp}] ____ `;
 
         // Insert the timestamp at the selection index
-        quillInstanceRef.current.insertText(range.index, formattedTimestamp);
+        quillInstanceRef.current.insertText(range.index, formattedTimestamp, 'user');
 
         if (isStartOfParagraph) {
           // Highlight the speaker number (right after "S") for paragraph start timestamps
@@ -386,8 +386,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
           const cursorPos = range.index + formattedTimestamp.length;
           quillInstanceRef.current.setSelection(cursorPos);
         }
-        // After insertion, validate timestamps order and highlight any out-of-order timestamps
-        scheduleValidateAllTimestamps(120);
+        // Validation removed - user must click button to validate
     }
   };
 
@@ -398,9 +397,9 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     const range = quill.getSelection() || { index: quill.getLength() };
     const speakerLabel = `S${speakerNumber}`;
     const formattedTimestamp = `${timestamp} ${speakerLabel}: `;
-    quill.insertText(range.index, formattedTimestamp);
+    quill.insertText(range.index, formattedTimestamp, 'user');
     quill.setSelection(range.index + formattedTimestamp.length);
-    scheduleValidateAllTimestamps(120);
+    // Validation removed - user must click button to validate
   };
 
   // Split paragraph at cursor, insert timestamp, and move text after cursor to a new paragraph.
@@ -431,17 +430,17 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     const newTimestamp = `${timestamp} S${speakerNumber}: `;
     
     // Delete text after cursor up to the end of paragraph
-    quill.deleteText(cursorIndex, textAfterCursor.length);
+    quill.deleteText(cursorIndex, textAfterCursor.length, 'user');
 
     // Insert two newlines (creates an empty line) and then the new paragraph
-    quill.insertText(cursorIndex, '\n\n');
-    quill.insertText(cursorIndex + 2, newTimestamp + textAfterCursor);
+    quill.insertText(cursorIndex, '\n\n', 'user');
+    quill.insertText(cursorIndex + 2, newTimestamp + textAfterCursor, 'user');
 
     // Highlight the speaker number (the digit after 'S') for editing
     // Position of 'S' is at: cursorIndex + 2 (for the two newlines) + timestamp.length + 1 (for space)
     const speakerNumberPos = cursorIndex + 2 + timestamp.length + 2; // +2 for " S"
     quill.setSelection(speakerNumberPos, 1); // Select just the digit
-    scheduleValidateAllTimestamps(120);
+    // Validation removed - user must click button to validate
   };
 
   // Parse timestamp strings like H:MM:SS(.ms) or M:SS(.ms) into seconds
@@ -489,9 +488,8 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     setCurrentInvalidIndex(0);
   };
 
-  // Validate all timestamps (visible viewport only) and highlight any that break ascending order
+  // Validate all timestamps and highlight any that break ascending order
   const validateAllTimestamps = () => {
-    if (!validateTimestampsEnabled) return;
     if (!quillInstanceRef.current) return;
     const quill = quillInstanceRef.current;
     const content = quill.getText();
@@ -502,36 +500,12 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     const timestamps = findAllTimestamps(content);
     if (timestamps.length === 0) return;
 
-    // Restrict to visible viewport
-    let visibleTimestamps = timestamps;
-    try {
-      const editorContainer = editorRef.current?.querySelector('.ql-editor');
-      if (editorContainer) {
-        const viewportTop = editorContainer.scrollTop;
-        const viewportBottom = viewportTop + editorContainer.clientHeight;
-        visibleTimestamps = timestamps.filter(t => {
-          const bounds = quill.getBounds(t.index, t.length);
-          if (!bounds) return false;
-          const bTop = bounds.top + viewportTop;
-          const bBottom = bTop + bounds.height;
-          return bTop < viewportBottom + 40 && bBottom > viewportTop - 40; // small buffer
-        });
-      }
-    } catch (e) {
-      // fallback to all timestamps
-    }
-    if (visibleTimestamps.length === 0) {
-      timestampInvalidsRef.current = [];
-      setInvalidTimestampCount(0);
-      setCurrentInvalidIndex(0);
-      return;
-    }
-
+    // Process ALL timestamps in the entire document, not just visible ones
     const invalids = [];
-    for (let i = 0; i < visibleTimestamps.length; i++) {
-      const cur = visibleTimestamps[i];
-      const prev = visibleTimestamps[i - 1];
-      const next = visibleTimestamps[i + 1];
+    for (let i = 0; i < timestamps.length; i++) {
+      const cur = timestamps[i];
+      const prev = timestamps[i - 1];
+      const next = timestamps[i + 1];
       const curSec = cur.seconds;
       let isInvalid = false;
       if (prev && !(curSec > prev.seconds)) {
@@ -545,7 +519,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
       if (isInvalid) invalids.push(cur);
     }
 
-    // Apply highlight to invalid timestamps (visible subset)
+    // Apply highlight to all invalid timestamps
     invalids.forEach(({ index, length }) => {
       try {
         quill.formatText(index, length, { background: '#FFD54D' });
@@ -986,12 +960,12 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     }
   }, [transcript, showHighlightRepeated]);
 
-  // Always re-validate timestamps order when transcript changes
-  useEffect(() => {
-    if (validateTimestampsEnabled) {
-      scheduleValidateAllTimestamps(200);
-    }
-  }, [transcript, validateTimestampsEnabled]);
+  // Remove continuous validation - only validate when button is clicked
+  // useEffect(() => {
+  //   if (validateTimestampsEnabled) {
+  //     scheduleValidateAllTimestamps(200);
+  //   }
+  // }, [transcript, validateTimestampsEnabled]);
 
   // Apply click handlers when onTimestampClick changes
   useEffect(() => {
@@ -1036,8 +1010,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
       repeatedPositionsRef.current = [];
       setCurrentRepeatedIndex(0);
       console.log('[Textarea] Cleared repeated speaker highlights');
-      // Re-validate timestamps to restore any timestamp highlights removed earlier
-      scheduleValidateAllTimestamps(150);
+      // Validation removed - user must click button to validate
       return;
     }
     
@@ -1733,10 +1706,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     const savedTranscript = localStorage.getItem('transcript');
     if (savedTranscript) {
       quill.root.innerHTML = savedTranscript; // Load the saved transcript into Quill
-      // Run timestamp validation after loading content (only if enabled)
-      if (validateTimestampsEnabled) {
-        scheduleValidateAllTimestamps(150);
-      }
+      // Validation removed - user must click button to validate
     }
 
     // Handle non-breaking spaces and replace with regular spaces
@@ -1753,8 +1723,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
 
       // Save the content to localStorage
       localStorage.setItem('transcript', updatedContent); // Save the content to localStorage
-      // Debounced validation to handle large pastes/rapid changes
-      scheduleValidateAllTimestamps(250);
+      // Validation removed - user must click button to validate
     });
 
     // Handle text selection
@@ -2610,6 +2579,15 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
                 <span>Invalid Timestamps</span>
                 <div className="flex items-center gap-2">
                   <button
+                    className="w-8 h-8 flex items-center justify-center rounded-lg shadow bg-white text-blue-600 hover:bg-blue-50"
+                    title="Rebuild list"
+                    onClick={() => validateAllTimestamps()}
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  </button>
+                  <button
                     className="w-8 h-8 flex items-center justify-center rounded-lg shadow bg-white text-yellow-700 hover:bg-yellow-50"
                     title="Previous invalid timestamp"
                     onClick={goToPrevInvalid}
@@ -2696,6 +2674,15 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
           <div className="px-3 pt-3 pb-1 text-xs font-semibold text-gray-700 flex items-center justify-between">
             <span>Invalid Timestamps</span>
             <div className="flex items-center gap-2">
+              <button
+                className="w-8 h-8 flex items-center justify-center rounded-lg shadow bg-white text-blue-600 hover:bg-blue-50"
+                title="Rebuild list"
+                onClick={() => validateAllTimestamps()}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              </button>
               <button
                 className="w-8 h-8 flex items-center justify-center rounded-lg shadow bg-white text-yellow-700 hover:bg-yellow-50"
                 title="Previous invalid timestamp"
@@ -2789,7 +2776,16 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
               <button
                 className={`w-8 h-8 flex items-center justify-center rounded-lg shadow transition-colors ${showInvalidList ? 'bg-indigo-500 text-white' : 'bg-white text-indigo-500 hover:bg-indigo-100'}`}
                 title="Invalid Timestamps"
-                onClick={() => setShowInvalidList(v => !v)}
+                onClick={() => {
+                  setShowInvalidList(v => {
+                    const next = !v;
+                    if (next) {
+                      // Build the list when opening the panel
+                      setTimeout(() => validateAllTimestamps(), 0);
+                    }
+                    return next;
+                  });
+                }}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                   <path d="M3 6h18M3 12h18M3 18h18" />
@@ -2804,16 +2800,19 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
 
             {/* dropdown removed — invalid list now opens in the right-side panel */}
           </div>
-          {/* Toggle validation */}
+          {/* Build invalid timestamp list */}
           <button
             className={`w-8 h-8 flex items-center justify-center rounded-lg shadow transition-colors ${validateTimestampsEnabled ? 'bg-green-500 text-white' : 'bg-white text-gray-500 hover:bg-gray-100'}`}
-            title="Toggle timestamp validation"
+            title="Find invalid timestamps (click once to build list)"
             onClick={() => {
+              // Toggle validation state for visual feedback
               setValidateTimestampsEnabled((prev) => {
                 const next = !prev;
                 if (next) {
-                  scheduleValidateAllTimestamps(120);
+                  // Build the list once when clicked
+                  validateAllTimestamps();
                 } else {
+                  // Clear highlights when clicked again
                   clearTimestampHighlights();
                 }
                 return next;
