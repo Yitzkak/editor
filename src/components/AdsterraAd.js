@@ -24,7 +24,7 @@ const AdsterraAd = ({ adId, format = 'banner', className = '' }) => {
       return;
     }
 
-    // Validate adId to prevent XSS - should only contain alphanumeric characters and underscores
+    // Validate adId to prevent XSS - should only contain alphanumeric characters, hyphens, and underscores
     const adIdPattern = /^[a-zA-Z0-9_-]+$/;
     if (!adIdPattern.test(adId)) {
       console.error('Invalid Adsterra ad ID format. Ad ID should only contain alphanumeric characters, hyphens, and underscores.');
@@ -88,8 +88,11 @@ const AdsterraAd = ({ adId, format = 'banner', className = '' }) => {
     return () => {
       clearTimeout(timer);
       // Cleanup: Remove all scripts when component unmounts
+      // Using removeChild loop for better browser compatibility
       if (adRef.current) {
-        adRef.current.replaceChildren();
+        while (adRef.current.firstChild) {
+          adRef.current.removeChild(adRef.current.firstChild);
+        }
       }
     };
   }, [adId, format]);
