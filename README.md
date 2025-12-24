@@ -2,6 +2,18 @@
 
 A transcription editor with advanced features for audio synchronization and text formatting.
 
+## 💰 NEW: Monetization Strategy
+
+**Want to make money with this editor?** We've integrated Adsterra ad support with a complete 10-day monetization plan.
+
+👉 **[Start Here: QUICK_START.md](./QUICK_START.md)** - Your action plan to start earning within 10 days
+
+📚 Additional Resources:
+- [MONETIZATION.md](./MONETIZATION.md) - Complete monetization strategy
+- [ADSTERRA_SETUP.md](./ADSTERRA_SETUP.md) - Detailed technical setup guide
+
+---
+
 ## Features
 
 ### Text Editor
