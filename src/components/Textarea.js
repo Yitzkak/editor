@@ -2092,7 +2092,12 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     Object.keys(bySpeaker).forEach(k => bySpeaker[k].sort((a,b) => a.start - b.start));
     // Pick only the first occurrence of each speaker
     const snippets = {};
-    const order = Object.keys(bySpeaker).sort();
+    // Sort speakers numerically (S1, S2, S3, ...) instead of lexicographically (S1, S10, S2)
+    const order = Object.keys(bySpeaker).sort((a, b) => {
+      const numA = parseInt(a.replace(/^S/, ''), 10);
+      const numB = parseInt(b.replace(/^S/, ''), 10);
+      return numA - numB;
+    });
     order.forEach(sp => {
       snippets[sp] = [bySpeaker[sp][0]];
     });
