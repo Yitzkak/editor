@@ -2090,28 +2090,11 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     });
     // Sort each speaker's items by start time
     Object.keys(bySpeaker).forEach(k => bySpeaker[k].sort((a,b) => a.start - b.start));
-    // Pick up to snippetCount evenly spaced
-    const pickEven = (arr, k) => {
-      if (arr.length <= k) return arr;
-      const result = [];
-      const step = (arr.length - 1) / (k - 1);
-      for (let i = 0; i < k; i++) {
-        const idx = Math.round(i * step);
-        result.push(arr[idx]);
-      }
-      // de-duplicate in case rounding collided
-      const seen = new Set();
-      return result.filter(it => {
-        const key = it.index;
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-      });
-    };
+    // Pick only the first occurrence of each speaker
     const snippets = {};
     const order = Object.keys(bySpeaker).sort();
     order.forEach(sp => {
-      snippets[sp] = pickEven(bySpeaker[sp], snippetCount);
+      snippets[sp] = [bySpeaker[sp][0]];
     });
     return { snippets, order };
   };
