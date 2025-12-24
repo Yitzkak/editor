@@ -2,6 +2,18 @@
 
 A transcription editor with advanced features for audio synchronization and text formatting.
 
+## 💰 NEW: Monetization Strategy
+
+**Want to make money with this editor?** We've integrated Adsterra ad support with a complete 10-day monetization plan.
+
+👉 **[Start Here: QUICK_START.md](./QUICK_START.md)** - Your action plan to start earning within 10 days
+
+📚 Additional Resources:
+- [MONETIZATION.md](./MONETIZATION.md) - Complete monetization strategy
+- [ADSTERRA_SETUP.md](./ADSTERRA_SETUP.md) - Detailed technical setup guide
+
+---
+
 ## Features
 
 ### Text Editor
@@ -28,6 +40,11 @@ A transcription editor with advanced features for audio synchronization and text
 ### Speaker Management
 - Swap speaker labels within selected text
 - Replace speaker labels
+
+### Monetization (Optional)
+- **Adsterra Integration**: Built-in support for monetizing your deployment
+- See [MONETIZATION.md](./MONETIZATION.md) for a complete 10-day strategy
+- See [ADSTERRA_SETUP.md](./ADSTERRA_SETUP.md) for setup instructions
 
 ## Usage
 
@@ -60,3 +77,14 @@ npm start
 ```
 
 The application will be available at `http://localhost:3000`.
+
+## Monetization
+
+To enable monetization through Adsterra ads:
+
+1. See [ADSTERRA_SETUP.md](./ADSTERRA_SETUP.md) for detailed setup instructions
+2. Copy `.env.example` to `.env.local` and add your Adsterra ad IDs
+3. Set `REACT_APP_ADSTERRA_ENABLED=true`
+4. Build and deploy
+
+For a complete monetization strategy, see [MONETIZATION.md](./MONETIZATION.md).

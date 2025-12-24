@@ -5,6 +5,7 @@ import Textarea from './components/Textarea';
 import MediaPlayer from './components/MediaPlayer';
 import FindReplaceModal from './components/FindReplaceModal';
 import SwapSpeakerModal from './components/SwapSpeakerModal';
+import AdsterraAd from './components/AdsterraAd';
 
 
 function App() {
@@ -396,6 +397,14 @@ function App() {
             <span className="ml-4 text-white text-xl">Loading audio...</span>
           </div>
         )}
+        
+        {/* Top Banner Ad */}
+        <AdsterraAd 
+          adId={process.env.REACT_APP_ADSTERRA_BANNER_TOP_ID} 
+          format="banner" 
+          className="w-full"
+        />
+
         {/* Media player at the top */}
         <div className="w-full">
           <MediaPlayer 
@@ -476,6 +485,13 @@ function App() {
             onRequestStop={handleRequestStop}
           />
         </div>
+
+        {/* Bottom Banner Ad */}
+        <AdsterraAd 
+          adId={process.env.REACT_APP_ADSTERRA_BANNER_BOTTOM_ID} 
+          format="banner" 
+          className="w-full"
+        />
 
         <FindReplaceModal
           isOpen={isModalOpen}
