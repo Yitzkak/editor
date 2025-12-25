@@ -93,7 +93,7 @@ npm install
 npm start
 
 # Build for production
-npm build
+npm run build
 
 # Run tests
 npm test
