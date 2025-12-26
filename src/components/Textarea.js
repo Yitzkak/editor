@@ -22,6 +22,19 @@ const predefinedWords = [
   'Cross-examination',
 ];
 
+// Meta tag shortcuts - typing "[" + two letters auto-expands to full tag
+const metaTagShortcuts = {
+  'ov': '[overlapping conversation]',
+  'la': '[laughter]',
+  'pa': '[pause]',
+  'ch': '[chuckle]',
+  'au': '[automated voice]',
+  'vi': '[video playback]',
+  'ba': '[background conversation]',
+  'fo': '[foreign language]',
+  'vo': '[vocalization]',
+};
+
 const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onRequestSwapModal, autosuggestionEnabled, onRequestPlayRange, onRequestStop }, ref) => {
   const editorRef = useRef(null);
   const quillInstanceRef = useRef(null); // Store Quill instance here
@@ -297,6 +310,24 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
       return;
     }
     const textBeforeCursor = quill.getText(0, range.index);
+    
+    // Check for meta tag shortcut expansion (e.g., "[ov" -> "[overlapping conversation]")
+    const metaTagMatch = textBeforeCursor.match(/\[([a-z]{2})$/i);
+    if (metaTagMatch) {
+      const shortcut = metaTagMatch[1].toLowerCase();
+      const expandedTag = metaTagShortcuts[shortcut];
+      if (expandedTag) {
+        // Auto-expand the shortcut
+        const startIndex = range.index - 3; // Position of "["
+        quill.deleteText(startIndex, 3); // Delete "[" + two letters
+        quill.insertText(startIndex, expandedTag + ' ');
+        quill.setSelection(startIndex + expandedTag.length + 1);
+        setSuggestions([]);
+        setCurrentInput('');
+        return;
+      }
+    }
+    
     // Use word boundary detection to find the current word being typed
     const match = textBeforeCursor.match(/\b\w*$/);
     const prefix = match ? match[0] : '';
@@ -1458,16 +1489,43 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     try {
       // Ctrl/Cmd+Z => undo
       quill.keyboard.addBinding({ key: 'z', shortKey: true }, function(range, context) {
-        try { quill.history.undo(); } catch (e) {}
+        try { 
+          quill.history.undo();
+          // Restore cursor position after undo
+          setTimeout(() => {
+            const selection = quill.getSelection();
+            if (selection) {
+              quill.setSelection(selection.index, selection.length);
+            }
+          }, 0);
+        } catch (e) {}
         return false;
       });
       // Ctrl/Cmd+Shift+Z or Ctrl+Y => redo
       quill.keyboard.addBinding({ key: 'z', shortKey: true, shiftKey: true }, function() {
-        try { quill.history.redo(); } catch (e) {}
+        try { 
+          quill.history.redo();
+          // Restore cursor position after redo
+          setTimeout(() => {
+            const selection = quill.getSelection();
+            if (selection) {
+              quill.setSelection(selection.index, selection.length);
+            }
+          }, 0);
+        } catch (e) {}
         return false;
       });
       quill.keyboard.addBinding({ key: 'y', shortKey: true }, function() {
-        try { quill.history.redo(); } catch (e) {}
+        try { 
+          quill.history.redo();
+          // Restore cursor position after redo
+          setTimeout(() => {
+            const selection = quill.getSelection();
+            if (selection) {
+              quill.setSelection(selection.index, selection.length);
+            }
+          }, 0);
+        } catch (e) {}
         return false;
       });
     } catch (e) {
