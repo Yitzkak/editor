@@ -494,13 +494,40 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
   };
 
   // Find all timestamp occurrences in content. Returns array sorted by index.
+  // Only matches timestamps in these formats:
+  // 1. Start of line with speaker label: "0:00:00.0 S1:" or "00:00:00.0 S1:"
+  // 2. Blank timestamps: "[0:00:00.0] ____"
   const findAllTimestamps = (content) => {
-    const regex = /\b\d{1,2}:\d{1,2}:\d{1,2}(?:\.\d+)?\b|\b\d{1,2}:\d{1,2}(?:\.\d+)?\b/g;
     const matches = [];
+    
+    // Pattern 1: Timestamp at start of line/paragraph with speaker label (H:MM:SS or HH:MM:SS with optional decimals)
+    // Matches formats like: "0:00:00.0 S1:" or "00:00:00.0 S2:"
+    const speakerTimestampRegex = /(?:^|\n)(\d{1,2}:\d{2}:\d{2}(?:\.\d+)?)\s+S\d+:/gm;
     let m;
-    while ((m = regex.exec(content)) !== null) {
-      matches.push({ index: m.index, length: m[0].length, text: m[0], seconds: parseTimestampToSeconds(m[0]) });
+    while ((m = speakerTimestampRegex.exec(content)) !== null) {
+      const timestamp = m[1];
+      const timestampIndex = m.index + (m[0].startsWith('\n') ? 1 : 0); // Adjust for newline
+      matches.push({ 
+        index: timestampIndex, 
+        length: timestamp.length, 
+        text: timestamp, 
+        seconds: parseTimestampToSeconds(timestamp) 
+      });
     }
+    
+    // Pattern 2: Blank timestamps: "[0:00:00.0] ____" or similar
+    const blankTimestampRegex = /\[(\d{1,2}:\d{2}:\d{2}(?:\.\d+)?)\]\s+____/g;
+    while ((m = blankTimestampRegex.exec(content)) !== null) {
+      const timestamp = m[1];
+      const timestampIndex = m.index + 1; // +1 to skip the opening bracket
+      matches.push({ 
+        index: timestampIndex, 
+        length: timestamp.length, 
+        text: timestamp, 
+        seconds: parseTimestampToSeconds(timestamp) 
+      });
+    }
+    
     return matches.sort((a, b) => a.index - b.index);
   };
 
