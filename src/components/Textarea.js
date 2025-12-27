@@ -499,35 +499,33 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
   // 2. Blank timestamps: "[0:00:00.0] ____"
   const findAllTimestamps = (content) => {
     const matches = [];
-    
-    // Pattern 1: Timestamp at start of line/paragraph with speaker label (H:MM:SS or HH:MM:SS with optional decimals)
-    // Matches formats like: "0:00:00.0 S1:" or "00:00:00.0 S2:"
-    const speakerTimestampRegex = /(?:^|\n)(\d{1,2}:\d{2}:\d{2}(?:\.\d+)?)\s+S\d+:/gm;
+    // Combined pattern: match either format in a single pass for better performance
+    // (?:^|\n)(\d{1,2}:\d{2}:\d{2}(?:\.\d+)?)\s+S\d+: OR \[(\d{1,2}:\d{2}:\d{2}(?:\.\d+)?)\]\s+____
+    const combinedRegex = /(?:(?:^|\n)(\d{1,2}:\d{2}:\d{2}(?:\.\d+)?)\s+S\d+:|\[(\d{1,2}:\d{2}:\d{2}(?:\.\d+)?)\]\s+____)/gm;
     let m;
-    while ((m = speakerTimestampRegex.exec(content)) !== null) {
-      const timestamp = m[1];
-      const timestampIndex = m.index + (m[0].startsWith('\n') ? 1 : 0); // Adjust for newline
-      matches.push({ 
-        index: timestampIndex, 
-        length: timestamp.length, 
-        text: timestamp, 
-        seconds: parseTimestampToSeconds(timestamp) 
-      });
+    while ((m = combinedRegex.exec(content)) !== null) {
+      if (m[1]) {
+        // Speaker timestamp format
+        const timestamp = m[1];
+        const timestampIndex = m.index + (m[0].startsWith('\n') ? 1 : 0);
+        matches.push({ 
+          index: timestampIndex, 
+          length: timestamp.length, 
+          text: timestamp, 
+          seconds: parseTimestampToSeconds(timestamp) 
+        });
+      } else if (m[2]) {
+        // Blank timestamp format
+        const timestamp = m[2];
+        const timestampIndex = m.index + 1; // +1 to skip the opening bracket
+        matches.push({ 
+          index: timestampIndex, 
+          length: timestamp.length, 
+          text: timestamp, 
+          seconds: parseTimestampToSeconds(timestamp) 
+        });
+      }
     }
-    
-    // Pattern 2: Blank timestamps: "[0:00:00.0] ____" or similar
-    const blankTimestampRegex = /\[(\d{1,2}:\d{2}:\d{2}(?:\.\d+)?)\]\s+____/g;
-    while ((m = blankTimestampRegex.exec(content)) !== null) {
-      const timestamp = m[1];
-      const timestampIndex = m.index + 1; // +1 to skip the opening bracket
-      matches.push({ 
-        index: timestampIndex, 
-        length: timestamp.length, 
-        text: timestamp, 
-        seconds: parseTimestampToSeconds(timestamp) 
-      });
-    }
-    
     return matches.sort((a, b) => a.index - b.index);
   };
 
