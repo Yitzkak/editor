@@ -614,30 +614,44 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     const timestamps = findAllTimestamps(content);
     if (timestamps.length === 0) return;
 
-    // Restrict to visible viewport only
-    let visibleTimestamps = timestamps;
+    // Get viewport range using character indices (much faster than getBounds)
+    let viewportStartIndex = 0;
+    let viewportEndIndex = content.length;
+    
     try {
       const editorContainer = editorRef.current?.querySelector('.ql-editor');
       if (editorContainer) {
-        const viewportTop = editorContainer.scrollTop;
-        const viewportBottom = viewportTop + editorContainer.clientHeight;
-        visibleTimestamps = timestamps.filter(t => {
-          const bounds = quill.getBounds(t.index, t.length);
-          if (!bounds) return false;
-          const bTop = bounds.top + viewportTop;
-          const bBottom = bTop + bounds.height;
-          return bTop < viewportBottom + 200 && bBottom > viewportTop - 200; // buffer for smooth scrolling
-        });
+        const selection = quill.getSelection();
+        if (selection) {
+          // Estimate viewport based on current cursor and scroll position
+          const scrollTop = editorContainer.scrollTop;
+          const scrollHeight = editorContainer.scrollHeight;
+          const clientHeight = editorContainer.clientHeight;
+          
+          // Rough estimate: if scrolled 50% down, show timestamps in middle 50% of document
+          const scrollRatio = scrollTop / Math.max(1, scrollHeight - clientHeight);
+          const bufferRatio = 0.3; // Show 30% before and after for smooth scrolling
+          
+          viewportStartIndex = Math.floor(content.length * Math.max(0, scrollRatio - bufferRatio));
+          viewportEndIndex = Math.ceil(content.length * Math.min(1, scrollRatio + bufferRatio + (clientHeight / scrollHeight)));
+        }
       }
     } catch (e) {
       // fallback to all timestamps
     }
 
+    // Filter timestamps to viewport using character index (no getBounds needed!)
+    const visibleTimestamps = timestamps.filter(t => 
+      t.index >= viewportStartIndex && t.index <= viewportEndIndex
+    );
+
+    // Validate each visible timestamp against ALL timestamps (not just visible ones)
     const invalids = [];
     for (let i = 0; i < visibleTimestamps.length; i++) {
       const cur = visibleTimestamps[i];
-      const prev = visibleTimestamps[i - 1];
-      const next = visibleTimestamps[i + 1];
+      const curFullIndex = timestamps.indexOf(cur);
+      const prev = timestamps[curFullIndex - 1];
+      const next = timestamps[curFullIndex + 1];
       const curSec = cur.seconds;
       let isInvalid = false;
       if (prev && !(curSec > prev.seconds)) {
