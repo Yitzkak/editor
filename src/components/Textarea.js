@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef, useImperativeHandle, forwardRef } f
 import Quill from 'quill';
 import 'quill/dist/quill.snow.css';
 import Fuse from 'fuse.js';
+import AdjustTimestampModal from './AdjustTimestampModal';
 
 const predefinedWords = [
   'Objection, form.', 
@@ -163,6 +164,10 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
 
   // Add this state for speaker characteristics
   const [speakerCharacteristics, setSpeakerCharacteristics] = useState({}); // { S1: ["deep voice", ...], ... }
+
+  // Adjust Timestamp state
+  const [showAdjustTimestamp, setShowAdjustTimestamp] = useState(false);
+  const adjustTimestampRangeRef = useRef(null);
 
   // Find & Replace state
   const [showFindReplace, setShowFindReplace] = useState(false);
@@ -1370,6 +1375,8 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     fixTranscript,
     joinParagraphs,
     removeActiveListeningCues,
+    removeFillerWords,
+    adjustTimestamps,
     // Expose trigger functions and state
     toggleSpeakerSnippets: () => {
       const { snippets, order } = buildSpeakerSnippets();
@@ -2204,6 +2211,74 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     quillInstanceRef.current.setSelection(range.index + result.length, 0);
   };
 
+  // Remove filler words from the entire transcript
+  const removeFillerWords = (fillers) => {
+    if (!quillInstanceRef.current || !fillers || fillers.length === 0) return;
+    const quill = quillInstanceRef.current;
+    const content = quill.getText();
+    
+    // Build regex patterns for each filler word
+    // Match filler words as standalone words (with word boundaries)
+    let cleanedContent = content;
+    
+    fillers.forEach(filler => {
+      // Escape special regex characters and create pattern
+      const escapedFiller = filler.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      // Match the word with optional punctuation and surrounding spaces
+      // This handles cases like "uh,", "um.", "like, ", etc.
+      const pattern = new RegExp(`\\b${escapedFiller}\\b[,.]?\\s*`, 'gi');
+      cleanedContent = cleanedContent.replace(pattern, '');
+    });
+    
+    // Clean up multiple spaces and preserve paragraph structure
+    cleanedContent = cleanedContent.replace(/  +/g, ' '); // Remove multiple spaces
+    cleanedContent = cleanedContent.replace(/ \n/g, '\n'); // Remove space before newline
+    cleanedContent = cleanedContent.replace(/\n /g, '\n'); // Remove space after newline
+    
+    // Update the editor content
+    quill.setText(cleanedContent);
+  };
+
+  // Adjust timestamps by adding or subtracting seconds from selected/highlighted timestamps
+  const adjustTimestamps = (secondsToAdjust) => {
+    if (!quillInstanceRef.current) return;
+    const quill = quillInstanceRef.current;
+    
+    // Use stored range from when modal was opened
+    const range = adjustTimestampRangeRef.current;
+    
+    // If no selection was stored, return
+    if (!range || range.length === 0) {
+      alert('Please select text containing timestamps to adjust.');
+      return;
+    }
+
+    const selectedText = quill.getText(range.index, range.length);
+    
+    // Format seconds as H:MM:SS.d or HH:MM:SS.d
+    const formatTimestamp = (totalSeconds) => {
+      const hours = Math.floor(totalSeconds / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = (totalSeconds % 60).toFixed(1);
+      return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(4, '0')}`;
+    };
+
+    // Parse and adjust timestamps
+    let adjustedText = selectedText.replace(
+      /(\d{1,2}):(\d{2}):(\d{2}(?:\.\d+)?)/g,
+      (match, h, m, s) => {
+        const currentSeconds = parseInt(h) * 3600 + parseInt(m) * 60 + parseFloat(s);
+        const newSeconds = Math.max(0, currentSeconds + secondsToAdjust);
+        return formatTimestamp(newSeconds);
+      }
+    );
+
+    // Replace the selected text with adjusted timestamps
+    quill.deleteText(range.index, range.length);
+    quill.insertText(range.index, adjustedText);
+    quill.setSelection(range.index, adjustedText.length);
+  };
+
   // Build speaker snippets from paragraphs
   const buildSpeakerSnippets = () => {
     if (!quillInstanceRef.current) return { snippets: {}, order: [] };
@@ -3005,6 +3080,28 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
               <path d="M9 12l2 2 4-4" />
             </svg>
           </button>
+          {/* Adjust Timestamps */}
+          <button
+            className={`w-8 h-8 flex items-center justify-center rounded-lg shadow transition-colors ${showAdjustTimestamp ? 'bg-indigo-500 text-white' : 'bg-white text-indigo-500 hover:bg-indigo-100'}`}
+            title="Adjust Timestamps"
+            onClick={() => {
+              // Store the current selection before opening modal
+              if (quillInstanceRef.current) {
+                const range = quillInstanceRef.current.getSelection();
+                if (range && range.length > 0) {
+                  adjustTimestampRangeRef.current = { index: range.index, length: range.length };
+                  setShowAdjustTimestamp(true);
+                } else {
+                  alert('Please select text containing timestamps first.');
+                }
+              }
+            }}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 6v6l4 2" />
+            </svg>
+          </button>
           {/* Notes toggle */}
         <button
           className={`w-8 h-8 flex items-center justify-center rounded-lg shadow transition-colors ${showNotes ? 'bg-indigo-500 text-white' : 'bg-white text-indigo-500 hover:bg-indigo-100'}`}
@@ -3029,6 +3126,16 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
           </svg>
         </button>
       </div>
+
+      {/* Adjust Timestamp Modal */}
+      <AdjustTimestampModal
+        isOpen={showAdjustTimestamp}
+        onClose={() => {
+          setShowAdjustTimestamp(false);
+          adjustTimestampRangeRef.current = null;
+        }}
+        onAdjust={adjustTimestamps}
+      />
     </div>
   </div>
   );

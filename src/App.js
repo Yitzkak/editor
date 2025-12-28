@@ -364,6 +364,13 @@ function App() {
     }
   };
 
+  // Add a handler to trigger removeFillerWords on the Textarea ref
+  const handleRemoveFillers = (fillers) => {
+    if (editorRef.current && editorRef.current.removeFillerWords) {
+      editorRef.current.removeFillerWords(fillers);
+    }
+  };
+
   // Add a handler to trigger highlightRepeatedSpeakers on the Textarea ref
   const handleHighlightRepeatedSpeakers = () => {
     if (editorRef.current && editorRef.current.highlightRepeatedSpeakers) {
@@ -458,6 +465,7 @@ function App() {
             onFixTranscript={handleFixTranscript}
             onJoinParagraphs={handleJoinParagraphs}
             onRemoveActiveListeningCues={handleRemoveActiveListeningCues}
+            onRemoveFillers={handleRemoveFillers}
             autosuggestionEnabled={autosuggestionEnabled}
             setAutosuggestionEnabled={setAutosuggestionEnabled}
           />

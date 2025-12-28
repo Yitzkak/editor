@@ -3,6 +3,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import SwapSpeakerModal from "./SwapSpeakerModal";
 import AmplifyVolumeModal from './AmplifyVolumeModal';
 import KeyboardShortcutsModal from './KeyboardShortcutsModal';
+import RemoveFillerWordsModal from './RemoveFillerWordsModal';
 
 //Icons import
 import { FiDownload, FiMoreHorizontal, FiZoomIn, FiZoomOut, FiSave, FiClock } from 'react-icons/fi';
@@ -64,6 +65,7 @@ const Toolbar = ({
   onFixTranscript,
   onJoinParagraphs,
   onRemoveActiveListeningCues,
+  onRemoveFillers,
 }) => {
   const fileInputRef = useRef(null);
   const [showPerfModal, setShowPerfModal] = useState(false);
@@ -71,6 +73,7 @@ const Toolbar = ({
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [isAmplifyOpen, setIsAmplifyOpen] = useState(false);
   const [showKeyboardShortcutsModal, setShowKeyboardShortcutsModal] = useState(false);
+  const [showRemoveFillers, setShowRemoveFillers] = useState(false);
   const dropdownRef = useRef(null);
   const moreButtonRef = useRef(null);
 
@@ -431,11 +434,28 @@ const Toolbar = ({
               <span style={{ marginRight: 16, fontWeight: 600, fontSize: 10}}>&#128483;</span>
               <span>Remove Active Listening Cues</span>
             </button>
+            <button
+              onClick={() => {
+                setShowRemoveFillers(true);
+                setDropdownOpen(false);
+              }}
+              className="flex items-center w-full px-6 py-4 text-[12px] hover:bg-gray-100"
+            >
+              <span style={{ marginRight: 16, fontWeight: 600, fontSize: 10}}>&#128465;</span>
+              <span>Remove Filler Words</span>
+            </button>
             {/* Highlight repeated speakers moved to Textarea button group */}
           </div>
         )}
 
-        
+        {/* Remove Filler Words Modal */}
+        {showRemoveFillers && (
+          <RemoveFillerWordsModal
+            isOpen={showRemoveFillers}
+            onClose={() => setShowRemoveFillers(false)}
+            onRemoveFillers={onRemoveFillers}
+          />
+        )}
 
         {/* Aplify Volume Modal */}
         {isAmplifyOpen && (
