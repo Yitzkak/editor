@@ -130,6 +130,40 @@ function App() {
     document.body.removeChild(element); // Clean up
   };
 
+  // Function to format paragraph breaks in the transcript
+  const formatParagraphBreaks = () => {
+    const getTextContent = () => editorRef.current?.getText();
+    const textContent = getTextContent();
+    if (!textContent) return;
+
+    // Regular expression to match timestamp entries (e.g., "0:03:07.7 S2: That works.")
+    // Pattern: time format followed by speaker label (S# or similar) followed by colon
+    const timestampPattern = /(\d+:\d+:\d+\.\d+\s+S\d+:)/g;
+    
+    // Split by timestamp pattern while keeping the timestamps
+    const parts = textContent.split(timestampPattern);
+    
+    let formattedText = '';
+    for (let i = 0; i < parts.length; i++) {
+      if (i % 2 === 1) {
+        // This is a timestamp
+        if (i > 1) {
+          formattedText += '\n\n'; // Add double newline before timestamp (except first one)
+        }
+        // Ensure there's a space after the colon
+        formattedText += parts[i] + ' ';
+      } else if (parts[i]) {
+        // This is the text after timestamp, trim any leading/trailing spaces
+        formattedText += parts[i].trim();
+      }
+    }
+    
+    // Set the formatted text back to the editor
+    if (editorRef.current) {
+      editorRef.current.setText(formattedText.trim());
+    }
+  };
+
   // Function to update the current time
   useEffect(() => {
     console.log('[App] performanceMode changed:', performanceMode);
@@ -444,6 +478,7 @@ function App() {
             handleAmplificationChange={handleAmplificationChange}
             amplification={amplification}
             downloadTranscript={downloadTranscript}
+            onSave={formatParagraphBreaks}
             speed={playbackSpeed * 100} 
             onSpeedChange={setPlaybackSpeed}
             onReplaceSpeakerLabel={handleReplaceSpeakerLabel} 

@@ -735,9 +735,17 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     let pattern = text;
     
     if (wholeWord) {
-      // Escape special regex characters and wrap with word boundaries
+      // Escape special regex characters
       const escapedText = text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      pattern = `\\b${escapedText}\\b`;
+      // Check if text starts/ends with word characters
+      const startsWithWord = /^\w/.test(text);
+      const endsWithWord = /\w$/.test(text);
+      // Only add word boundaries where the search text has word characters at edges
+      const prefix = startsWithWord ? '(?<=^|\\W)' : '';
+      const suffix = endsWithWord ? '(?=\\W|$)' : '';
+      pattern = `${prefix}${escapedText}${suffix}`;
+    } else {
+      pattern = text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
     
     const regex = new RegExp(pattern, flags);
@@ -762,7 +770,13 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     let pattern = escapedFindText;
     
     if (wholeWord) {
-      pattern = `\\b${escapedFindText}\\b`;
+      // Check if text starts/ends with word characters
+      const startsWithWord = /^\w/.test(findText);
+      const endsWithWord = /\w$/.test(findText);
+      // Only add word boundaries where the search text has word characters at edges
+      const prefix = startsWithWord ? '(?<=^|\\W)' : '';
+      const suffix = endsWithWord ? '(?=\\W|$)' : '';
+      pattern = `${prefix}${escapedFindText}${suffix}`;
     }
     
     const regex = new RegExp(pattern, flags);
@@ -789,7 +803,13 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     let pattern = escapedFindText;
     
     if (wholeWord) {
-      pattern = `\\b${escapedFindText}\\b`;
+      // Check if text starts/ends with word characters
+      const startsWithWord = /^\w/.test(findText);
+      const endsWithWord = /\w$/.test(findText);
+      // Only add word boundaries where the search text has word characters at edges
+      const prefix = startsWithWord ? '(?<=^|\\W)' : '';
+      const suffix = endsWithWord ? '(?=\\W|$)' : '';
+      pattern = `${prefix}${escapedFindText}${suffix}`;
     }
     
     const regex = new RegExp(pattern, flags);

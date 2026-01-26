@@ -66,6 +66,7 @@ const Toolbar = ({
   onJoinParagraphs,
   onRemoveActiveListeningCues,
   onRemoveFillers,
+  onSave,
 }) => {
   const fileInputRef = useRef(null);
   const [showPerfModal, setShowPerfModal] = useState(false);
@@ -227,7 +228,7 @@ const Toolbar = ({
       </button>
       
       {/* Save icon */}
-      <button className="text-gray-600 p-1  hover:text-blue-500" title="Save">
+      <button onClick={onSave} className="text-gray-600 p-1  hover:text-blue-500" title="Save">
         <FiSave size={21} />
       </button>
 
