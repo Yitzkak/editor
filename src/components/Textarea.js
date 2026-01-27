@@ -256,16 +256,12 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     if (range && range.length > 0) {
       const selectedText = quillInstanceRef.current.getText(range.index, range.length).trim();
   
-      // Remove special characters except underscores, letters, and numbers
-      const cleanedText = selectedText.replace(/[^a-zA-Z0-9_ ]/g, '');
+      // Check if text is already in spelled-out format (e.g., "S H, A, N, N, O, N" or "S H A N N O N")
+      // Remove all separators (commas, spaces, hyphens) and special characters, keeping only letters and numbers
+      const cleanedText = selectedText.replace(/[^a-zA-Z0-9]/g, '');
   
-      // Check if it's a single word (no spaces except between letters)
-      const isSingleWord = cleanedText.split(' ').length === 1;
-  
-      // Format text with hyphens
-      const formattedText = isSingleWord
-        ? cleanedText.replace(/\s+/g, '').toUpperCase().split('').join('-') // Uppercase for single words
-        : cleanedText.split(' ').map(word => word.split('').join('-')).join(' ').toUpperCase(); // Keep case for multiple words
+      // Format text with hyphens between each character
+      const formattedText = cleanedText.toUpperCase().split('').join('-');
   
       // Replace the selected text with formatted text
       quillInstanceRef.current.deleteText(range.index, range.length);
