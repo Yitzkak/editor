@@ -6,7 +6,7 @@ import KeyboardShortcutsModal from './KeyboardShortcutsModal';
 import RemoveFillerWordsModal from './RemoveFillerWordsModal';
 
 //Icons import
-import { FiDownload, FiMoreHorizontal, FiZoomIn, FiZoomOut, FiSave, FiClock } from 'react-icons/fi';
+import { FiDownload, FiMoreHorizontal, FiZoomIn, FiZoomOut, FiSave, FiClock, FiRotateCcw } from 'react-icons/fi';
 import { TbPlayerSkipBack, TbPlayerSkipForward, TbPlayerTrackNext, TbPlayerTrackPrev, TbVolume, TbVolume2 } from "react-icons/tb";
 import { PiPlayPauseBold } from "react-icons/pi";
 import { RiFindReplaceLine, RiFileUploadLine } from "react-icons/ri";
@@ -67,6 +67,7 @@ const Toolbar = ({
   onRemoveActiveListeningCues,
   onRemoveFillers,
   onSave,
+  onShowVersionHistory,
 }) => {
   const fileInputRef = useRef(null);
   const [showPerfModal, setShowPerfModal] = useState(false);
@@ -230,6 +231,11 @@ const Toolbar = ({
       {/* Save icon */}
       <button onClick={onSave} className="text-gray-600 p-1  hover:text-blue-500" title="Save">
         <FiSave size={21} />
+      </button>
+
+      {/* Version History icon */}
+      <button onClick={onShowVersionHistory} className="text-gray-600 p-1 hover:text-blue-500" title="Version History">
+        <FiRotateCcw size={21} />
       </button>
 
       {/* Speed icon */}

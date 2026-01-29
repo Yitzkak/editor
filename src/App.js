@@ -5,6 +5,7 @@ import Textarea from './components/Textarea';
 import MediaPlayer from './components/MediaPlayer';
 import FindReplaceModal from './components/FindReplaceModal';
 import SwapSpeakerModal from './components/SwapSpeakerModal';
+import VersionHistoryModal from './components/VersionHistoryModal';
 
 
 function App() {
@@ -40,6 +41,13 @@ function App() {
   const [showSwapModal, setShowSwapModal] = useState(false);
   const [fromLabel, setFromLabel] = useState('S1');
   const [toLabel, setToLabel] = useState('S2');
+
+  // Version History state
+  const [versions, setVersions] = useState(() => {
+    const saved = localStorage.getItem('transcript_versions');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [showVersionHistory, setShowVersionHistory] = useState(false);
 
   const editorRef = useRef(null);
   const mediaPlayerRef = useRef(null);
@@ -130,11 +138,65 @@ function App() {
     document.body.removeChild(element); // Clean up
   };
 
+  // Function to save a version of the transcript
+  const saveVersion = useCallback(() => {
+    const getTextContent = () => editorRef.current?.getText();
+    const textContent = getTextContent();
+    if (!textContent || !textContent.trim()) return;
+
+    const newVersion = {
+      id: Date.now(),
+      timestamp: Date.now(),
+      content: textContent
+    };
+
+    setVersions(prevVersions => {
+      const updatedVersions = [...prevVersions, newVersion];
+      // Persist to localStorage
+      localStorage.setItem('transcript_versions', JSON.stringify(updatedVersions));
+      return updatedVersions;
+    });
+  }, []);
+
+  // Autosave versions every 5 minutes
+  useEffect(() => {
+    const interval = setInterval(() => {
+      saveVersion();
+    }, 5 * 60 * 1000); // 5 minutes
+
+    return () => clearInterval(interval);
+  }, [saveVersion]);
+
+  // Function to restore a version
+  const restoreVersion = (versionId) => {
+    const version = versions.find(v => v.id === versionId);
+    if (!version || !editorRef.current) return;
+
+    // Save current state as a new version before restoring
+    saveVersion();
+
+    // Restore the selected version
+    editorRef.current.setText(version.content);
+  };
+
+  // Function to delete a version
+  const deleteVersion = (versionId) => {
+    setVersions(prevVersions => {
+      const updatedVersions = prevVersions.filter(v => v.id !== versionId);
+      // Persist to localStorage
+      localStorage.setItem('transcript_versions', JSON.stringify(updatedVersions));
+      return updatedVersions;
+    });
+  };
+
   // Function to format paragraph breaks in the transcript
   const formatParagraphBreaks = () => {
     const getTextContent = () => editorRef.current?.getText();
     const textContent = getTextContent();
     if (!textContent) return;
+
+    // Save current version before formatting
+    saveVersion();
 
     // Regular expression to match timestamp entries (e.g., "0:03:07.7 S2: That works.")
     // Pattern: time format followed by speaker label (S# or similar) followed by colon
@@ -479,6 +541,7 @@ function App() {
             amplification={amplification}
             downloadTranscript={downloadTranscript}
             onSave={formatParagraphBreaks}
+            onShowVersionHistory={() => setShowVersionHistory(true)}
             speed={playbackSpeed * 100} 
             onSpeedChange={setPlaybackSpeed}
             onReplaceSpeakerLabel={handleReplaceSpeakerLabel} 
@@ -547,6 +610,14 @@ function App() {
             setToLabel={setToLabel}
           />
         )}
+
+        <VersionHistoryModal
+          isOpen={showVersionHistory}
+          onClose={() => setShowVersionHistory(false)}
+          versions={versions}
+          onRestore={restoreVersion}
+          onDelete={deleteVersion}
+        />
       </div>
     </div>
   );
