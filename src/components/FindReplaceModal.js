@@ -58,6 +58,7 @@ const FindReplaceModal = ({
       document.removeEventListener('mousemove', onMouseMove);
       document.removeEventListener('mouseup', onMouseUp);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, dragging, offset]);
 
   if (!isOpen) return null;

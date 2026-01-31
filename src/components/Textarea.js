@@ -1987,8 +1987,6 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
   useEffect(() => {
     if (!replaceMode || !quillInstanceRef.current) return;
 
-    const { selectedText } = replaceMode;
-
     // Handle text input during replace mode
     // Removed previous replace-on-type behavior; multi-edit is handled inline in keydown/paste handlers
     return;

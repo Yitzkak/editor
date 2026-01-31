@@ -1,4 +1,4 @@
-import React, {useState, useEffect } from 'react';
+import React from 'react';
 
 const AmplifyVolumeModal = ({ isOpen, onClose, onIncrease, onDecrease, amplification }) => {
   if (!isOpen) return null;

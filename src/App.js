@@ -31,10 +31,14 @@ function App() {
   // State for trigger buttons
   const [showSpeakerSnippets, setShowSpeakerSnippets] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
+  // eslint-disable-next-line no-unused-vars
   const [detectedSpeakerCount, setDetectedSpeakerCount] = useState(0);
 
+  // eslint-disable-next-line no-unused-vars
   const [audioContext, setAudioContext] = useState(null);
+  // eslint-disable-next-line no-unused-vars
   const [gainNode, setGainNode] = useState(null);
+  // eslint-disable-next-line no-unused-vars
   const [gainValue, setGainValue] = useState(1); // Default gain is 1 (normal volume)
 
   // Swap Speaker Modal state
@@ -79,18 +83,18 @@ function App() {
   };
 
   // Function to handle play/pause
-  const togglePlayPause = () => mediaPlayerRef.current?.togglePlayPause();
-  const skipBack = () => {
+  const togglePlayPause = useCallback(() => mediaPlayerRef.current?.togglePlayPause(), []);
+  const skipBack = useCallback(() => {
     mediaPlayerRef.current?.skipBack(5); // Skip back 5 seconds
     mediaPlayerRef.current?.playAudio();
     return true;
-  } 
+  }, []); 
   // Function to handle skip forward
-  const skipForward = () => {
+  const skipForward = useCallback(() => {
     mediaPlayerRef.current?.skipForward(5); // Skip forward 5 seconds
     mediaPlayerRef.current?.playAudio();
     return true;
-  }
+  }, []);
   
   const goToStart = () => mediaPlayerRef.current?.seekTo(0);
   const goToEnd = () => mediaPlayerRef.current?.goToEnd(); 
@@ -120,10 +124,10 @@ function App() {
     setTranscript(newTranscript);
   };
 
-  const getTimestamp = () => mediaPlayerRef.current?.getTimestamp();
-  const insertTimestamp = (timestamp, speakerNumber) => editorRef.current?.insertTimestamp(timestamp, speakerNumber);
-  const insertTimestampForced = (timestamp, speakerNumber) => editorRef.current?.insertTimestampForced?.(timestamp, speakerNumber);
-  const splitParagraphWithTimestamp = (timestamp, speakerNumber) => editorRef.current?.splitParagraphWithTimestamp?.(timestamp, speakerNumber);
+  const getTimestamp = useCallback(() => mediaPlayerRef.current?.getTimestamp(), []);
+  const insertTimestamp = useCallback((timestamp, speakerNumber) => editorRef.current?.insertTimestamp(timestamp, speakerNumber), []);
+  const insertTimestampForced = useCallback((timestamp, speakerNumber) => editorRef.current?.insertTimestampForced?.(timestamp, speakerNumber), []);
+  const splitParagraphWithTimestamp = useCallback((timestamp, speakerNumber) => editorRef.current?.splitParagraphWithTimestamp?.(timestamp, speakerNumber), []);
 
   // Function to download the transcript
   const downloadTranscript = () => {
@@ -488,6 +492,7 @@ function App() {
   };
 
   // Add a handler to trigger highlightRepeatedSpeakers on the Textarea ref
+  // eslint-disable-next-line no-unused-vars
   const handleHighlightRepeatedSpeakers = () => {
     if (editorRef.current && editorRef.current.highlightRepeatedSpeakers) {
       editorRef.current.highlightRepeatedSpeakers();
@@ -495,6 +500,7 @@ function App() {
   };
 
   // Handle toggle speaker snippets
+  // eslint-disable-next-line no-unused-vars
   const handleToggleSpeakerSnippets = () => {
     if (editorRef.current) {
       editorRef.current.toggleSpeakerSnippets();
@@ -503,6 +509,7 @@ function App() {
   };
 
   // Handle toggle notes
+  // eslint-disable-next-line no-unused-vars
   const handleToggleNotes = () => {
     if (editorRef.current) {
       editorRef.current.toggleNotes();

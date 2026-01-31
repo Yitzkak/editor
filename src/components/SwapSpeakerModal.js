@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 
 const SwapSpeakerModal = ({ onClose, handleReplaceClick, handleSwapClick, fromLabel, toLabel, setFromLabel, setToLabel }) => {
 

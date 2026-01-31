@@ -125,6 +125,7 @@ const MediaPlayer = forwardRef(({ mediaFile, volume, amplification = 1, speed, p
         document.removeEventListener('mouseup', handleMouseUp);
       };
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDragging, isResizing, dragOffset, resizeDirection, resizeStart, isVideo]);
 
   const initializeWaveSurfer = () => {
@@ -295,8 +296,10 @@ const MediaPlayer = forwardRef(({ mediaFile, volume, amplification = 1, speed, p
         longAudioUrlRef.current = null;
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mediaFile]);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (waveformRef.current && !wavesurfer.current) {
       initializeWaveSurfer();
@@ -361,6 +364,7 @@ const MediaPlayer = forwardRef(({ mediaFile, volume, amplification = 1, speed, p
         video.removeEventListener('seeked', handleSeeked);
       };
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isVideo, videoRef.current, wavesurfer.current]);
 
   useEffect(() => {
@@ -374,6 +378,7 @@ const MediaPlayer = forwardRef(({ mediaFile, volume, amplification = 1, speed, p
       console.log('[MediaPlayer] set long audio playbackRate:', speed);
       longAudioRef.current.playbackRate = speed;
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [speed, isVideo]);
 
   useEffect(() => {
@@ -387,6 +392,7 @@ const MediaPlayer = forwardRef(({ mediaFile, volume, amplification = 1, speed, p
       console.log('[MediaPlayer] set long audio volume:', volume);
       longAudioRef.current.volume = volume;
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [volume, isVideo]);
 
   // Compute placeholder bar count to fill the available width
@@ -526,7 +532,6 @@ const MediaPlayer = forwardRef(({ mediaFile, volume, amplification = 1, speed, p
         a.currentTime = a.duration || 0;
         a.pause();
       } else if (wavesurfer.current) {
-        const duration = wavesurfer.current.getDuration();
         wavesurfer.current.seekTo(1);
         wavesurfer.current.pause();
       }
