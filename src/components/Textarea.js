@@ -305,7 +305,6 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     // Only show suggestions if the user recently typed or pasted — avoid showing on mouse clicks
     if (!suggestionTriggerRef.current) {
       setSuggestions([]);
-      setCurrentInput('');
       return;
     }
     const textBeforeCursor = quill.getText(0, range.index);
@@ -322,7 +321,6 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
         quill.insertText(startIndex, expandedTag + ' ');
         quill.setSelection(startIndex + expandedTag.length + 1);
         setSuggestions([]);
-        setCurrentInput('');
         return;
       }
     }
@@ -330,7 +328,6 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     // Use word boundary detection to find the current word being typed
     const match = textBeforeCursor.match(/\b\w*$/);
     const prefix = match ? match[0] : '';
-    setCurrentInput(prefix);
     suggestionContextRef.current = { prefix, cursorIndex: range.index };
     let allSuggestions = [];
     let displayToOriginal = {};
@@ -387,7 +384,6 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     quill.insertText(startIndex, originalWord + ' ');
     quill.setSelection(startIndex + originalWord.length + 1);
     setSuggestions([]);
-    setCurrentInput('');
     return false;
   };
 
