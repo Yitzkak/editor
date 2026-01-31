@@ -1,6 +1,5 @@
 // Toolbar.js
 import React, { useRef, useState, useEffect } from 'react';
-import SwapSpeakerModal from "./SwapSpeakerModal";
 import AmplifyVolumeModal from './AmplifyVolumeModal';
 import KeyboardShortcutsModal from './KeyboardShortcutsModal';
 import RemoveFillerWordsModal from './RemoveFillerWordsModal';

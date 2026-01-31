@@ -152,8 +152,24 @@ function App() {
 
     setVersions(prevVersions => {
       const updatedVersions = [...prevVersions, newVersion];
-      // Persist to localStorage
-      localStorage.setItem('transcript_versions', JSON.stringify(updatedVersions));
+      // Persist to localStorage with error handling
+      try {
+        localStorage.setItem('transcript_versions', JSON.stringify(updatedVersions));
+      } catch (e) {
+        if (e.name === 'QuotaExceededError') {
+          console.warn('Cannot save version history: storage quota exceeded');
+          // Keep only the most recent 5 versions
+          const limitedVersions = updatedVersions.slice(-5);
+          try {
+            localStorage.setItem('transcript_versions', JSON.stringify(limitedVersions));
+            return limitedVersions;
+          } catch (retryError) {
+            console.error('Failed to save even limited version history:', retryError);
+          }
+        } else {
+          console.error('Error saving version history:', e);
+        }
+      }
       return updatedVersions;
     });
   }, []);
@@ -183,8 +199,12 @@ function App() {
   const deleteVersion = (versionId) => {
     setVersions(prevVersions => {
       const updatedVersions = prevVersions.filter(v => v.id !== versionId);
-      // Persist to localStorage
-      localStorage.setItem('transcript_versions', JSON.stringify(updatedVersions));
+      // Persist to localStorage with error handling
+      try {
+        localStorage.setItem('transcript_versions', JSON.stringify(updatedVersions));
+      } catch (e) {
+        console.error('Error saving version history after deletion:', e);
+      }
       return updatedVersions;
     });
   };

@@ -45,7 +45,6 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
 
   const [suggestions, setSuggestions] = useState([]);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0);
-  const [currentInput, setCurrentInput] = useState('');
 
   // Notes panel state
   const [showNotes, setShowNotes] = useState(false);
@@ -113,8 +112,6 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
 
   const lastMenuOpenTimeRef = useRef(0);
 
-  const inputPrefixRef = useRef('');
-
   const suggestionContextRef = useRef({ prefix: '', cursorIndex: 0 });
 
   // Add a ref for the suggestions popup
@@ -141,6 +138,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
       return 3;
     }
   });
+  // eslint-disable-next-line no-unused-vars
   const [snippetDuration, setSnippetDuration] = useState(() => {
     try {
       const val = parseFloat(localStorage.getItem('snippet_duration'), 10);
@@ -593,6 +591,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
   };
 
   // Debounce validation to avoid excessive passes on large documents
+  // eslint-disable-next-line no-unused-vars
   const scheduleValidateAllTimestamps = (delay = 200) => {
     if (validateTimerRef.current) {
       clearTimeout(validateTimerRef.current);
@@ -1048,6 +1047,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
   };
 
   // Handle clicks outside to close suggestions and context menu
+  // eslint-disable-next-line no-unused-vars
   const handleClickOutside = (event) => {
     // Ignore the first event after opening the menu
     if (Date.now() - lastMenuOpenTimeRef.current < 150) return;
@@ -1127,6 +1127,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
   }, [transcript, validateTimestampsEnabled]);
 
   // Add scroll listener for viewport validation
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!validateTimestampsEnabled) return;
     
@@ -1144,6 +1145,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
   }, [validateTimestampsEnabled]);
 
   // Apply click handlers when onTimestampClick changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (onTimestampClick && quillInstanceRef.current) {
       makeTimestampsClickable(onTimestampClick);
@@ -1390,6 +1392,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     formatTitleCase, // Expose the function
     fixTranscript,
     joinParagraphs,
+    joinSameSpeakerParagraphs,
     removeActiveListeningCues,
     removeFillerWords,
     adjustTimestamps,
@@ -1718,6 +1721,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     };
 
     // Paste handler for multi-edit mode
+    // eslint-disable-next-line no-unused-vars
     const handlePaste = (evt) => {
       if (!virtualCursorsRef.current || virtualCursorsRef.current.length === 0) return;
       evt.preventDefault();
@@ -1927,15 +1931,36 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
       }
 
       // Save the content to localStorage
-      localStorage.setItem('transcript', updatedContent); // Save the content to localStorage
+      try {
+        localStorage.setItem('transcript', updatedContent); // Save the content to localStorage
+      } catch (e) {
+        if (e.name === 'QuotaExceededError') {
+          console.warn('localStorage quota exceeded. Attempting to free up space...');
+          // Try to clear version history to free up space
+          try {
+            localStorage.removeItem('transcript_versions');
+            // Retry saving the transcript
+            localStorage.setItem('transcript', updatedContent);
+            console.log('Successfully saved transcript after clearing version history');
+          } catch (retryError) {
+            console.error('Failed to save transcript even after clearing space:', retryError);
+            // Alert user only once
+            if (!window.__transcriptQuotaWarningShown) {
+              window.__transcriptQuotaWarningShown = true;
+              alert('Storage space is full. Your changes may not be saved automatically. Consider downloading your transcript.');
+            }
+          }
+        } else {
+          console.error('Error saving transcript:', e);
+        }
+      }
       // Validation removed - user must click button to validate
     });
 
     // Handle text selection
     quill.on('selection-change', (range) => {
       if (range && range.length > 0) {
-        const selectedText = quill.getText(range.index, range.length);
-        setHighlightedText(selectedText);
+        setHighlightedText(quill.getText(range.index, range.length));
         setSelectionRange(range); 
       }
     });
@@ -1948,6 +1973,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
       // Clean up scroll event
       if (quill.__scrollCleanup) quill.__scrollCleanup();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fontSize, autosuggestionEnabled]);
 
   // Add this useEffect to auto-run capitalization every 1 minute
@@ -1958,6 +1984,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
       }
     }, 60000); // 60,000 ms = 1 minute
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Handle Ctrl+K replace mode: replace all occurrences as user types
@@ -1982,6 +2009,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
   }, []); // Only on mount
 
   // Only add the global click/contextmenu handler when the suggestions popup or context menu is visible
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!contextMenu.visible && suggestions.length === 0) return;
     function handleGlobalClick(event) {
@@ -2190,6 +2218,75 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     const cleaned = [firstContent, ...paragraphs.slice(1).map(p => p.replace(/^((\d{1,2}:){2}\d{1,2}(?:\.\d+)?\s+S\d+:\s*)/, '').trim())];
     // Join all cleaned paragraphs with a space
     const joined = prefix + cleaned.join(' ');
+    // Replace the selected text with the joined result
+    quillInstanceRef.current.deleteText(range.index, range.length);
+    quillInstanceRef.current.insertText(range.index, joined);
+    quillInstanceRef.current.setSelection(range.index + joined.length, 0);
+  };
+
+  // Join consecutive paragraphs with the same speaker number within highlighted text
+  const joinSameSpeakerParagraphs = () => {
+    if (!quillInstanceRef.current) return;
+    const range = quillInstanceRef.current.getSelection();
+    if (!range || range.length === 0) {
+      alert('Please select text first.');
+      return;
+    }
+    const selectedText = quillInstanceRef.current.getText(range.index, range.length);
+    // Split by double newlines (paragraphs)
+    const paragraphs = selectedText.split(/\r?\n\r?\n/).map(p => p.trim()).filter(Boolean);
+    if (paragraphs.length === 0) return;
+    
+    const result = [];
+    let currentGroup = null;
+    
+    for (const para of paragraphs) {
+      // Extract timestamp and speaker label (e.g., "0:12:34 S1: ")
+      const match = para.match(/^((\d{1,2}:){2}\d{1,2}(?:\.\d+)?\s+(S\d+):\s*)/);
+      
+      if (match) {
+        const timestamp = match[1];
+        const speaker = match[3]; // e.g., "S1"
+        const content = para.slice(match[0].length).trim();
+        
+        if (currentGroup && currentGroup.speaker === speaker) {
+          // Same speaker - append content to current group
+          currentGroup.content += ' ' + content;
+        } else {
+          // Different speaker or first paragraph - start new group
+          if (currentGroup) {
+            result.push(currentGroup);
+          }
+          currentGroup = {
+            timestamp: timestamp,
+            speaker: speaker,
+            content: content
+          };
+        }
+      } else {
+        // Paragraph without timestamp/speaker - append to current group or skip
+        if (currentGroup) {
+          currentGroup.content += ' ' + para;
+        } else {
+          // No current group, keep as is
+          result.push({ timestamp: '', speaker: '', content: para });
+        }
+      }
+    }
+    
+    // Add the last group
+    if (currentGroup) {
+      result.push(currentGroup);
+    }
+    
+    // Reconstruct the text
+    const joined = result.map(group => {
+      if (group.timestamp) {
+        return group.timestamp + group.content;
+      }
+      return group.content;
+    }).join('\n\n');
+    
     // Replace the selected text with the joined result
     quillInstanceRef.current.deleteText(range.index, range.length);
     quillInstanceRef.current.insertText(range.index, joined);
@@ -3118,6 +3215,17 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
               <path d="M12 6v6l4 2" />
             </svg>
           </button>
+          {/* Join Same Speaker Paragraphs */}
+        <button
+          className="w-8 h-8 flex items-center justify-center rounded-lg shadow bg-white text-indigo-500 hover:bg-indigo-100"
+          title="Join consecutive same-speaker paragraphs in selection"
+          onClick={joinSameSpeakerParagraphs}
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <path d="M4 6h16M4 12h16M4 18h7m5 0h4"/>
+            <path d="M14 15l3 3 3-3"/>
+          </svg>
+        </button>
           {/* Notes toggle */}
         <button
           className={`w-8 h-8 flex items-center justify-center rounded-lg shadow transition-colors ${showNotes ? 'bg-indigo-500 text-white' : 'bg-white text-indigo-500 hover:bg-indigo-100'}`}
