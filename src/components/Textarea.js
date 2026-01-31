@@ -2000,6 +2000,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     return () => {
       editorContainer.removeEventListener('contextmenu', handleEditorRightClick);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only on mount
 
   // Only add the global click/contextmenu handler when the suggestions popup or context menu is visible
@@ -2023,6 +2024,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     };
   }, [contextMenu.visible, suggestions.length]);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const editorContainer = editorRef.current && editorRef.current.querySelector('.ql-editor');
     if (!editorContainer) return;

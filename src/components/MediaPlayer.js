@@ -311,6 +311,7 @@ const MediaPlayer = forwardRef(({ mediaFile, volume, amplification = 1, speed, p
         wavesurfer.current = null;
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Sync video playback with waveform
