@@ -1123,7 +1123,6 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
   }, [transcript, validateTimestampsEnabled]);
 
   // Add scroll listener for viewport validation
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!validateTimestampsEnabled) return;
     
@@ -1138,15 +1137,14 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     return () => {
       editorContainer.removeEventListener('scroll', handleScroll);
     };
-  }, [validateTimestampsEnabled]);
+  }, [validateTimestampsEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Apply click handlers when onTimestampClick changes
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (onTimestampClick && quillInstanceRef.current) {
       makeTimestampsClickable(onTimestampClick);
     }
-  }, [onTimestampClick]);
+  }, [onTimestampClick]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Reset selected suggestion index when suggestions change
   useEffect(() => {
@@ -2032,7 +2030,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     return () => {
       editorContainer.removeEventListener('contextmenu', handleEditorRightClick);
     };
-  }, [editorRef]);
+  }, [editorRef]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Debug: log contextMenu before return
   console.log('contextMenu state:', contextMenu);
