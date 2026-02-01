@@ -599,7 +599,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
   };
 
   // Validate only timestamps in the viewport (for continuous validation when toggle is on)
-  const validateViewportTimestamps = () => {
+  const validateViewportTimestamps = useCallback(() => {
     if (!quillInstanceRef.current) return;
     const quill = quillInstanceRef.current;
     const content = quill.getText();
@@ -666,9 +666,9 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
         timestampHighlightsRef.current.push({ index, length });
       } catch (e) {}
     });
-  };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const scheduleValidateViewportTimestamps = (delay = 200) => {
+  const scheduleValidateViewportTimestamps = useCallback((delay = 200) => {
     if (validateTimerRef.current) {
       clearTimeout(validateTimerRef.current);
     }
@@ -676,7 +676,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
       validateTimerRef.current = null;
       validateViewportTimestamps();
     }, delay);
-  };
+  }, [validateViewportTimestamps]);
 
   // Compute available height for invalid timestamps panel based on editor area
   const computeInvalidPanelHeight = () => {
@@ -1137,7 +1137,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     return () => {
       editorContainer.removeEventListener('scroll', handleScroll);
     };
-  }, [validateTimestampsEnabled]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [validateTimestampsEnabled, scheduleValidateViewportTimestamps]);
 
   // Apply click handlers when onTimestampClick changes
   useEffect(() => {
