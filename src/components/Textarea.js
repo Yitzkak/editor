@@ -208,8 +208,8 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     const transformedLines = lines.map(line => {
       if (/^\r?\n$/.test(line)) return line;
       let processed = line;
-      // Capitalize after timestamp+speaker label
-      processed = processed.replace(/((\d{1,2}:){2}\d{1,2}(?:\.\d+)?\s+S\d+:\s*)([a-zA-Z])/, (m, p1, _p2, p3) => {
+      // Capitalize after timestamp+speaker label (accept non-digit speaker IDs like S?:)
+      processed = processed.replace(/((\d{1,2}:){2}\d{1,2}(?:\.\d+)?\s+S[^:\s]+:\s*)([a-zA-Z])/, (m, p1, _p2, p3) => {
         return p1 + p3.toUpperCase();
       });
       // Capitalize after . ? ! (sentence boundaries)
@@ -495,8 +495,8 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
   const findAllTimestamps = (content) => {
     const matches = [];
     // Combined pattern: match either format in a single pass for better performance
-    // (?:^|\n)(\d{1,2}:\d{2}:\d{2}(?:\.\d+)?)\s+S\d+: OR \[(\d{1,2}:\d{2}:\d{2}(?:\.\d+)?)\]\s+____
-    const combinedRegex = /(?:(?:^|\n)(\d{1,2}:\d{2}:\d{2}(?:\.\d+)?)\s+S\d+:|\[(\d{1,2}:\d{2}:\d{2}(?:\.\d+)?)\]\s+____)/gm;
+    // (?:^|\n)(\d{1,2}:\d{2}:\d{2}(?:\.\d+)?)\s+S[^:\s]+: OR \[(\d{1,2}:\d{2}:\d{2}(?:\.\d+)?)\]\s+____
+    const combinedRegex = /(?:(?:^|\n)(\d{1,2}:\d{2}:\d{2}(?:\.\d+)?)\s+S[^:\s]+:|\[(\d{1,2}:\d{2}:\d{2}(?:\.\d+)?)\]\s+____)/gm;
     let m;
     while ((m = combinedRegex.exec(content)) !== null) {
       if (m[1]) {
@@ -1186,8 +1186,8 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
       return;
     }
     
-    // Pattern to match speaker labels: S1, S2, S3, etc.
-    const speakerPattern = /\bS(\d+)\b/g;
+    // Pattern to match speaker labels: S1, S2, S?, S-A, etc. (capture full ID after 'S')
+    const speakerPattern = /\bS([^:\s]+)\b/g;
     
     let match;
     let previousSpeaker = null;
@@ -1195,7 +1195,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     
     // First pass: find all speaker labels and identify repeats
     while ((match = speakerPattern.exec(content)) !== null) {
-      const currentSpeaker = match[1]; // Get just the number (e.g., "1" from "S1")
+      const currentSpeaker = match[1]; // Get the speaker ID (e.g., "1" from "S1" or "?" from "S?:")
       if (previousSpeaker === currentSpeaker) {
         // Found a repeat - highlight this occurrence
         positions.push({
@@ -2060,7 +2060,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
   // Helper: extract timestamp+speaker label
   function extractLabel(line) {
     // e.g., 0:42:14.0 S1:
-    const match = line.match(/^((\d{1,2}:){2}\d{1,2}(?:\.\d+)?\s+S\d+:\s*)/);
+    const match = line.match(/^((\d{1,2}:){2}\d{1,2}(?:\.\d+)?\s+S[^:\s]+:\s*)/);
     if (match) {
       return { label: match[0], rest: line.slice(match[0].length) };
     }
@@ -2069,7 +2069,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
 
   // Helper: checks if a string starts with a timestamp+speaker label
   function isSpeakerLine(line) {
-    return /^((\d{1,2}:){2}\d{1,2}(?:\.\d+)?\s+S\d+:\s*)/.test(line);
+    return /^((\d{1,2}:){2}\d{1,2}(?:\.\d+)?\s+S[^:\s]+:\s*)/.test(line);
   }
 
   // Fix transcript logic
@@ -2209,7 +2209,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
       firstContent = paragraphs[0].slice(prefix.length).trim();
     }
     // Remove all subsequent timestamps and speaker labels
-    const cleaned = [firstContent, ...paragraphs.slice(1).map(p => p.replace(/^((\d{1,2}:){2}\d{1,2}(?:\.\d+)?\s+S\d+:\s*)/, '').trim())];
+    const cleaned = [firstContent, ...paragraphs.slice(1).map(p => p.replace(/^((\d{1,2}:){2}\d{1,2}(?:\.\d+)?\s+S[^:\s]+:\s*)/, '').trim())];
     // Join all cleaned paragraphs with a space
     const joined = prefix + cleaned.join(' ');
     // Replace the selected text with the joined result
@@ -2236,7 +2236,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     
     for (const para of paragraphs) {
       // Extract timestamp and speaker label (e.g., "0:12:34 S1: ")
-      const match = para.match(/^((\d{1,2}:){2}\d{1,2}(?:\.\d+)?\s+(S\d+):\s*)/);
+      const match = para.match(/^((\d{1,2}:){2}\d{1,2}(?:\.\d+)?\s+(S[^:\s]+):\s*)/);
       
       if (match) {
         const timestamp = match[1];
@@ -2394,7 +2394,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     const items = []; // {speaker, start, end, index}
     for (let i = 0; i < paragraphs.length; i++) {
       const p = paragraphs[i];
-      const match = p.match(/^((\d{1,2}:){2}\d{1,2}(?:\.\d+)?)[\s]+(S\d+):\s*/);
+      const match = p.match(/^((\d{1,2}:){2}\d{1,2}(?:\.\d+)?)[\s]+(S[^:\s]+):\s*/);
       if (!match) continue;
       const startStr = match[1];
       const speakerId = match[3];
@@ -2407,7 +2407,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
       let end = null;
       for (let j = i + 1; j < paragraphs.length; j++) {
         const n = paragraphs[j];
-        const m2 = n.match(/^((\d{1,2}:){2}\d{1,2}(?:\.\d+)?)[\s]+S\d+:\s*/);
+        const m2 = n.match(/^((\d{1,2}:){2}\d{1,2}(?:\.\d+)?)[\s]+S[^:\s]+:\s*/);
         if (m2) {
           end = toSeconds(m2[1]);
           break;
@@ -2427,9 +2427,16 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     const snippets = {};
     // Sort speakers numerically (S1, S2, S3, ...) instead of lexicographically (S1, S10, S2)
     const order = Object.keys(bySpeaker).sort((a, b) => {
-      const numA = parseInt(a.replace(/^S/, ''), 10);
-      const numB = parseInt(b.replace(/^S/, ''), 10);
-      return numA - numB;
+      // Try numeric sort when possible; otherwise fall back to locale string compare
+      const strip = (s) => s.replace(/^S/, '');
+      const numA = parseInt(strip(a), 10);
+      const numB = parseInt(strip(b), 10);
+      const aIsNum = !Number.isNaN(numA);
+      const bIsNum = !Number.isNaN(numB);
+      if (aIsNum && bIsNum) return numA - numB;
+      if (aIsNum) return -1; // numbers before non-numeric
+      if (bIsNum) return 1;
+      return a.localeCompare(b);
     });
     order.forEach(sp => {
       snippets[sp] = [bySpeaker[sp][0]];
