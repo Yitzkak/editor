@@ -25,8 +25,22 @@ function App() {
   const [autosuggestionEnabled, setAutosuggestionEnabled] = useState(true);
   const [performanceMode, setPerformanceMode] = useState(false); // Hide waveform for >3h files
   // Right-Ctrl timestamp behavior: when true, pressing Right Control inserts a proper timestamp S# regardless of cursor
-  const [rightCtrlInsertProper, setRightCtrlInsertProper] = useState(false);
-  const [rightCtrlSpeaker, setRightCtrlSpeaker] = useState(1);
+  const [rightCtrlInsertProper, setRightCtrlInsertProper] = useState(() => {
+    try {
+      const v = localStorage.getItem('rightCtrlInsertProper');
+      return v === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
+  const [rightCtrlSpeaker, setRightCtrlSpeaker] = useState(() => {
+    try {
+      const v = parseInt(localStorage.getItem('rightCtrlSpeaker'), 10);
+      return Number.isFinite(v) && v > 0 ? v : 1;
+    } catch (e) {
+      return 1;
+    }
+  });
 
   // State for trigger buttons
   const [showSpeakerSnippets, setShowSpeakerSnippets] = useState(false);
@@ -298,6 +312,18 @@ function App() {
   };
 
   useEffect(() => {
+    try {
+      localStorage.setItem('rightCtrlInsertProper', rightCtrlInsertProper ? 'true' : 'false');
+    } catch (e) {}
+  }, [rightCtrlInsertProper]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('rightCtrlSpeaker', String(rightCtrlSpeaker));
+    } catch (e) {}
+  }, [rightCtrlSpeaker]);
+
+  useEffect(() => {
     const handleKeyDown = (e) => {
       // Check for specific key combinations and call corresponding functions
       if (e.shiftKey && e.code === "Tab") {
@@ -354,7 +380,7 @@ function App() {
   
     // Attach the event listener
     window.addEventListener("keydown", handleKeyDown);
-  
+
     // Cleanup the listener on component unmount
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
@@ -518,8 +544,8 @@ function App() {
   };
 
   return (
-    <div className="flex justify-center min-w-96  bg-gray-100 p-[5px] h-screen relative" >
-      <div className="flex flex-col max-h-full items-center w-full max-w-6xl rounded-sm">
+    <div className="flex flex-col min-w-0 bg-gray-100 p-1 h-screen relative">
+      <div className="flex flex-col w-full h-full">
         {audioLoading && (
           <div className="fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-50 z-50">
             <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-blue-500 border-solid"></div>
@@ -540,7 +566,7 @@ function App() {
         </div>
         
         {/* Toolbar at the top, passing handleFileUpload */}
-        <div className="mt-3">
+        <div className="mt-3 w-full">
           <Toolbar 
             onFileUpload={handleFileUpload}
             setPerformanceMode={setPerformanceMode}
@@ -597,7 +623,7 @@ function App() {
         </div>
 
         {/* Textarea underneath the toolbar */}
-        <div className="w-full bg-white mt-4 relative">
+        <div className="w-full bg-white mt-4 relative flex-1 min-h-0">
           <Textarea 
             ref={editorRef} 
             fontSize={fontSize} 

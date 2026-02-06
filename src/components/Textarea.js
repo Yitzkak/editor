@@ -2461,13 +2461,13 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
   );
 
   return (
-    <div className="w-full h-[460px] shadow-lg border">
-      <div className="flex h-full">
-        <div className="flex h-full flex-1 relative min-w-0">
+    <div className="w-full flex-1 h-full shadow-lg border min-h-0">
+      <div className="flex h-full min-h-0">
+        <div className="flex h-full flex-1 relative min-w-0 min-h-0">
           {/* Quill editor container */}
           <div
             ref={editorRef}
-            className="flex-1 min-w-0 font-monox bg-white rounded-md h-full break-words word-space-2 whitespace-pre-wrap"
+            className="flex-1 min-w-0 font-monox bg-white rounded-md h-full break-words word-space-2 whitespace-pre-wrap overflow-auto"
             title="Right-click on timestamps (like '0:00:36.4 S2:') to play audio from that point"
           ></div>
           {/* Overlay for rendering multi-cursor carets */}
