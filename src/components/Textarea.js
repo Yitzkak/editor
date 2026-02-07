@@ -198,8 +198,10 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
   const formatTitleCase = () => {
     if (!quillInstanceRef.current) return;
 
-    // Save the current selection (cursor position)
+    // Save the current selection (cursor position) and scroll position
     const currentSelection = quillInstanceRef.current.getSelection();
+    const editorEl = editorRef.current?.querySelector('.ql-editor');
+    const prevScrollTop = editorEl ? editorEl.scrollTop : null;
 
     // Get the entire transcript text
     const content = quillInstanceRef.current.getText();
@@ -223,14 +225,17 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
       return processed;
     });
     const transformedText = transformedLines.join("");
-    quillInstanceRef.current.setText(transformedText);
+    quillInstanceRef.current.setText(transformedText, 'silent');
 
     // Restore the previous selection (cursor position)
     if (currentSelection) {
       // Clamp the index to the new text length
       const newLength = quillInstanceRef.current.getLength();
       const index = Math.min(currentSelection.index, newLength - 1);
-      quillInstanceRef.current.setSelection(index, currentSelection.length || 0);
+      quillInstanceRef.current.setSelection(index, currentSelection.length || 0, 'silent');
+    }
+    if (editorEl && prevScrollTop !== null) {
+      editorEl.scrollTop = prevScrollTop;
     }
   };
 
@@ -1186,8 +1191,8 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
       return;
     }
     
-    // Pattern to match speaker labels: S1, S2, S?, S-A, etc. (capture full ID after 'S')
-    const speakerPattern = /\bS([^:\s]+)\b/g;
+    // Pattern to match speaker labels: S#: where # is a number or ? (e.g., S1: or S?:)
+    const speakerPattern = /\bS(\d+|\?)\s*:/g;
     
     let match;
     let previousSpeaker = null;
@@ -1195,7 +1200,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     
     // First pass: find all speaker labels and identify repeats
     while ((match = speakerPattern.exec(content)) !== null) {
-      const currentSpeaker = match[1]; // Get the speaker ID (e.g., "1" from "S1" or "?" from "S?:")
+      const currentSpeaker = match[1]; // Get the speaker ID (e.g., "1" from "S1:" or "?" from "S?:")
       if (previousSpeaker === currentSpeaker) {
         // Found a repeat - highlight this occurrence
         positions.push({
@@ -1920,8 +1925,15 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
       if (htmlContent !== updatedContent) {
         // Use Quill API to set the updated content without resetting the cursor
         const currentSelection = quill.getSelection(); // Save the current cursor position
+        const editorEl = editorRef.current?.querySelector('.ql-editor');
+        const prevScrollTop = editorEl ? editorEl.scrollTop : null;
         quill.root.innerHTML = updatedContent; // Update the content
-        quill.setSelection(currentSelection); // Restore the cursor position
+        if (currentSelection) {
+          quill.setSelection(currentSelection); // Restore the cursor position
+        }
+        if (editorEl && prevScrollTop !== null) {
+          editorEl.scrollTop = prevScrollTop; // Preserve scroll position
+        }
       }
 
       // Save the content to localStorage
