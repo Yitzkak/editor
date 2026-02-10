@@ -6,10 +6,12 @@ import MediaPlayer from './components/MediaPlayer';
 import FindReplaceModal from './components/FindReplaceModal';
 import SwapSpeakerModal from './components/SwapSpeakerModal';
 import VersionHistoryModal from './components/VersionHistoryModal';
+import HomePage from './components/HomePage';
 
 
 function App() {
   const [mediaFile, setMediaFile] = useState(null);
+  const [route, setRoute] = useState(() => window.location.hash || '#/');
   const [volume, setVolume] = useState(1);
   const [fontSize, setFontSize] = useState(16);
   const [transcript, setTranscript] = useState('');
@@ -70,6 +72,30 @@ function App() {
   const editorRef = useRef(null);
   const mediaPlayerRef = useRef(null);
   const playRangeTimerRef = useRef(null);
+
+  useEffect(() => {
+    const handleHashChange = () => setRoute(window.location.hash || '#/');
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  useEffect(() => {
+    if (!route.startsWith('#/editor')) return;
+    try {
+      const payloadRaw = localStorage.getItem('scriptorfi_editor_payload');
+      if (!payloadRaw) return;
+      const payload = JSON.parse(payloadRaw);
+      if (payload?.text) {
+        setTranscript(payload.text);
+      }
+      if (payload?.fileName) {
+        document.title = `Editor · ${payload.fileName}`;
+      }
+      localStorage.removeItem('scriptorfi_editor_payload');
+    } catch (e) {
+      // Ignore parse errors
+    }
+  }, [route]);
 
   const handleIncrease = () => {
     if (mediaPlayerRef.current) {
@@ -543,9 +569,19 @@ function App() {
     }
   };
 
-  return (
+  const goToEditor = () => {
+    window.location.hash = '#/editor';
+  };
+
+  const renderEditor = () => (
     <div className="flex flex-col min-w-0 bg-gray-100 p-1 h-screen relative">
       <div className="flex flex-col w-full h-full">
+        <a
+          href="#/"
+          className="absolute right-4 top-4 z-50 rounded-full bg-white/90 px-4 py-2 text-xs font-semibold text-slate-800 shadow-sm transition hover:-translate-y-0.5"
+        >
+          Home
+        </a>
         {audioLoading && (
           <div className="fixed inset-0 flex items-center justify-center bg-gray-800 bg-opacity-50 z-50">
             <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-blue-500 border-solid"></div>
@@ -674,6 +710,12 @@ function App() {
       </div>
     </div>
   );
+
+  if (route.startsWith('#/editor')) {
+    return renderEditor();
+  }
+
+  return <HomePage onStart={goToEditor} />;
 }
 
 export default App;
