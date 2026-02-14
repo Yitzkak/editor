@@ -10,6 +10,7 @@ const predefinedWords = [
   '[overlapping conversation]', '[laughter]', '[pause]', '[chuckle]', 
   '[automated voice]', '[video playback]',
   '[background conversation]', '[foreign language]', '[vocalization]',
+  '[music]', '[applause]',
   // Add more common phrases for contextual suggestions
   'Let the record reflect',
   'Off the record',
@@ -34,6 +35,8 @@ const metaTagShortcuts = {
   'ba': '[background conversation]',
   'fo': '[foreign language]',
   'vo': '[vocalization]',
+  'mu': '[music]',
+  'ap': '[applause]',
 };
 
 const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onRequestSwapModal, autosuggestionEnabled, onRequestPlayRange, onRequestStop }, ref) => {
@@ -761,6 +764,11 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
 
   const replaceText = (findText, replaceText, caseSensitive = false, wholeWord = false) => {
     if (!quillInstanceRef.current) return;
+    
+    // Save scroll position
+    const editorEl = editorRef.current?.querySelector('.ql-editor');
+    const prevScrollTop = editorEl ? editorEl.scrollTop : null;
+    
     const escapedFindText = escapeRegExp(findText);
     const flags = caseSensitive ? '' : 'i';
     let pattern = escapedFindText;
@@ -785,6 +793,13 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     } else {
       alert('Text not found.');
     }
+    
+    // Restore scroll position
+    if (editorEl && prevScrollTop !== null) {
+      requestAnimationFrame(() => {
+        editorEl.scrollTop = prevScrollTop;
+      });
+    }
   };
 
   const getText = () => {
@@ -794,6 +809,11 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
 
   const replaceAll = (findText, replaceText, caseSensitive = false, wholeWord = false) => {
     if (!quillInstanceRef.current) return;
+    
+    // Save scroll position
+    const editorEl = editorRef.current?.querySelector('.ql-editor');
+    const prevScrollTop = editorEl ? editorEl.scrollTop : null;
+    
     const escapedFindText = escapeRegExp(findText);
     const flags = 'g' + (caseSensitive ? '' : 'i');
     let pattern = escapedFindText;
@@ -812,6 +832,13 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     const content = quillInstanceRef.current.getText();
     const newContent = content.replace(regex, replaceText);
     quillInstanceRef.current.setText(newContent);
+    
+    // Restore scroll position
+    if (editorEl && prevScrollTop !== null) {
+      requestAnimationFrame(() => {
+        editorEl.scrollTop = prevScrollTop;
+      });
+    }
   };
 
   const replaceSpeakerLabel = (fromLabel, toLabel) => {
@@ -854,7 +881,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     
     let charIndex = 0;
     lines.forEach((line, index) => {
-      const match = line.match(/^(\d+):(\d+):(\d+\.?\d*)\s+S\d+:/);
+      const match = line.match(/^(\d+):(\d+):(\d+\.?\d*)\s+S(?:\d+|\?):/);
       if (match) {
         const hours = parseInt(match[1]);
         const minutes = parseInt(match[2]);
@@ -939,7 +966,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
             console.log('textAround', textAround);
             
             // Find the timestamp in the text
-            const timestampMatch = textAround.match(/(\d+:\d+:\d+\.?\d*)\s+S\d+:/);
+            const timestampMatch = textAround.match(/(\d+:\d+:\d+\.?\d*)\s+S(?:\d+|\?):/);
             if (timestampMatch) {
               // Find the DOM element containing this text
               const textNodes = editorContainer.querySelectorAll('*');
@@ -990,7 +1017,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     const textBefore = quillInstanceRef.current.getText(Math.max(0, range.index - 30), 30);
     const textAfter = quillInstanceRef.current.getText(range.index, 30);
     const surroundingText = textBefore + textAfter;
-    const timestampMatch = surroundingText.match(/(\d+):(\d+):(\d+\.?\d*)\s+S\d+:/);
+    const timestampMatch = surroundingText.match(/(\d+):(\d+):(\d+\.?\d*)\s+S(?:\d+|\?):/);
     // Check for highlighted text
     let selectedText = '';
     let showGoogle = false;
@@ -999,7 +1026,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
       selectedText = quillInstanceRef.current.getText(range.index, range.length).trim();
       showGoogle = selectedText.length > 0;
       // Check for speaker labels in selected text
-      const speakerLabels = selectedText.match(/S\d+/g);
+      const speakerLabels = selectedText.match(/S(?:\d+|\?)/g);
       showSwapSpeaker = speakerLabels && speakerLabels.length > 0;
     }
     // Only show menu if timestamp or selection
@@ -1068,7 +1095,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     const textAfter = quillInstanceRef.current.getText(clickIndex, 30);
     const surroundingText = textBefore + textAfter;
     
-    const timestampMatch = surroundingText.match(/(\d+):(\d+):(\d+\.?\d*)\s+S\d+:/);
+    const timestampMatch = surroundingText.match(/(\d+):(\d+):(\d+\.?\d*)\s+S(?:\d+|\?):/);
     if (timestampMatch) {
       const timestampText = timestampMatch[0];
       const timestampStart = surroundingText.indexOf(timestampText);
@@ -1097,7 +1124,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
       const index = createTimestampIndex(content);
       setTimestampIndex(index);
       // Update speaker count snapshot
-      const speakerMatches = content.match(/\bS\d+:/g) || [];
+      const speakerMatches = content.match(/\bS(?:\d+|\?):/g) || [];
       const speakerSet = new Set(speakerMatches.map(s => s.replace(/:$/, '')));
       const count = speakerSet.size;
       console.log('Speaker detection:', { 
@@ -1550,46 +1577,48 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     // Assign the Quill instance to the ref
     quillInstanceRef.current = quill;
     // Ensure undo/redo keyboard shortcuts work even if keyboard config is minimal
+    // Flag to prevent nbsp replacement during undo/redo
+    quill.__isUndoRedo = false;
     try {
       // Ctrl/Cmd+Z => undo
       quill.keyboard.addBinding({ key: 'z', shortKey: true }, function(range, context) {
-        try { 
+        try {
+          quill.__isUndoRedo = true;
+          const prevSelection = quill.getSelection();
           quill.history.undo();
-          // Restore cursor position after undo
+          // Restore cursor position after undo - Quill's history should handle this,
+          // but we ensure it's correct after a short delay
           setTimeout(() => {
-            const selection = quill.getSelection();
-            if (selection) {
-              quill.setSelection(selection.index, selection.length);
-            }
-          }, 0);
-        } catch (e) {}
+            quill.__isUndoRedo = false;
+          }, 50);
+        } catch (e) {
+          quill.__isUndoRedo = false;
+        }
         return false;
       });
       // Ctrl/Cmd+Shift+Z or Ctrl+Y => redo
       quill.keyboard.addBinding({ key: 'z', shortKey: true, shiftKey: true }, function() {
-        try { 
+        try {
+          quill.__isUndoRedo = true;
           quill.history.redo();
-          // Restore cursor position after redo
           setTimeout(() => {
-            const selection = quill.getSelection();
-            if (selection) {
-              quill.setSelection(selection.index, selection.length);
-            }
-          }, 0);
-        } catch (e) {}
+            quill.__isUndoRedo = false;
+          }, 50);
+        } catch (e) {
+          quill.__isUndoRedo = false;
+        }
         return false;
       });
       quill.keyboard.addBinding({ key: 'y', shortKey: true }, function() {
-        try { 
+        try {
+          quill.__isUndoRedo = true;
           quill.history.redo();
-          // Restore cursor position after redo
           setTimeout(() => {
-            const selection = quill.getSelection();
-            if (selection) {
-              quill.setSelection(selection.index, selection.length);
-            }
-          }, 0);
-        } catch (e) {}
+            quill.__isUndoRedo = false;
+          }, 50);
+        } catch (e) {
+          quill.__isUndoRedo = false;
+        }
         return false;
       });
     } catch (e) {
@@ -1918,7 +1947,16 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     }
 
     // Handle non-breaking spaces and replace with regular spaces
-    quill.on('text-change', () => {
+    quill.on('text-change', (delta, oldDelta, source) => {
+      // Skip processing during undo/redo to prevent cursor jumping
+      if (quill.__isUndoRedo) {
+        // Still save to localStorage but don't modify content
+        try {
+          localStorage.setItem('transcript', quill.root.innerHTML);
+        } catch (e) {}
+        return;
+      }
+
       const htmlContent = quill.root.innerHTML; // Get the content of the editor
       const updatedContent = htmlContent.replace(/&nbsp;/g, ' '); // Replace &nbsp; with spaces
 
@@ -1927,7 +1965,12 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
         const currentSelection = quill.getSelection(); // Save the current cursor position
         const editorEl = editorRef.current?.querySelector('.ql-editor');
         const prevScrollTop = editorEl ? editorEl.scrollTop : null;
+        
+        // Disable history while making this change to avoid polluting undo stack
+        quill.history.ignoreChange = true;
         quill.root.innerHTML = updatedContent; // Update the content
+        quill.history.ignoreChange = false;
+        
         if (currentSelection) {
           quill.setSelection(currentSelection); // Restore the cursor position
         }
@@ -2213,7 +2256,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     const paragraphs = selectedText.split(/\r?\n\r?\n/).map(p => p.trim()).filter(Boolean);
     if (paragraphs.length === 0) return;
     // Extract the first timestamp+speaker label
-    const firstMatch = paragraphs[0].match(/^((\d{1,2}:){2}\d{1,2}(?:\.\d+)?\s+S\d+:\s*)/);
+    const firstMatch = paragraphs[0].match(/^((\d{1,2}:){2}\d{1,2}(?:\.\d+)?\s+S(?:\d+|\?):\s*)/);
     let prefix = '';
     let firstContent = paragraphs[0];
     if (firstMatch) {
@@ -2316,7 +2359,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
       const prev = i > 0 ? paragraphs[i-1].trim() : '';
       const curr = paragraphs[i].trim();
       // Remove timestamp+speaker label for cue check
-      const cueContent = curr.replace(/^((\d{1,2}:){2}\d{1,2}(?:\.\d+)?\s+S\d+:\s*)/, '').trim();
+      const cueContent = curr.replace(/^((\d{1,2}:){2}\d{1,2}(?:\.\d+)?\s+S(?:\d+|\?):\s*)/, '').trim();
       // If previous paragraph does NOT end with ? and this is a one-word cue, skip it
       if (i > 0 && !/\?$/.test(prev) && cues.includes(cueContent.toLowerCase())) {
         continue;
@@ -2776,12 +2819,12 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
               Speaker Snippets
             </div>
           )}
-          {contextMenu.selectedText && contextMenu.selectedText.match(/^((\d{1,2}:){2}\d{1,2}(?:\.\d+)?)[\s]+S\d+:/) && (
+          {contextMenu.selectedText && contextMenu.selectedText.match(/^((\d{1,2}:){2}\d{1,2}(?:\.\d+)?)[\s]+S(?:\d+|\?):/) && (
             <div
               className="px-4 py-2 hover:bg-indigo-100 cursor-pointer text-sm font-medium text-indigo-700 flex items-center"
               onClick={() => {
                 // Add to Speaker Snippets logic
-                const match = contextMenu.selectedText.match(/^((\d{1,2}:){2}\d{1,2}(?:\.\d+)?)[\s]+(S\d+):/);
+                const match = contextMenu.selectedText.match(/^((\d{1,2}:){2}\d{1,2}(?:\.\d+)?)[\s]+(S(?:\d+|\?)):/);
                 if (match) {
                   const startStr = match[1];
                   const speakerId = match[3];
@@ -2804,7 +2847,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
                   }
                   if (foundIdx !== -1) {
                     for (let j = foundIdx + 1; j < paragraphs.length; j++) {
-                      const m2 = paragraphs[j].match(/^((\d{1,2}:){2}\d{1,2}(?:\.\d+)?)[\s]+S\d+:\s*/);
+                      const m2 = paragraphs[j].match(/^((\d{1,2}:){2}\d{1,2}(?:\.\d+)?)[\s]+S(?:\d+|\?):\s*/);
                       if (m2) {
                         end = toSeconds(m2[1]);
                         break;
