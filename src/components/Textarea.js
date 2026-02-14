@@ -131,8 +131,22 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     }
   });
   const [showSpeakerSnippets, setShowSpeakerSnippets] = useState(false);
-  const [speakerSnippets, setSpeakerSnippets] = useState({}); // { S1: [{start,end,index}], ... }
-  const [speakerOrder, setSpeakerOrder] = useState([]); // ["S1","S2",...]
+  const [speakerSnippets, setSpeakerSnippets] = useState(() => {
+    try {
+      const saved = localStorage.getItem('speaker_snippets');
+      return saved ? JSON.parse(saved) : {};
+    } catch (e) {
+      return {};
+    }
+  }); // { S1: [{start,end,index}], ... }
+  const [speakerOrder, setSpeakerOrder] = useState(() => {
+    try {
+      const saved = localStorage.getItem('speaker_order');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  }); // ["S1","S2",...]
   const [snippetCount, setSnippetCount] = useState(() => {
     try {
       const val = parseInt(localStorage.getItem('snippet_count'), 10);
@@ -362,6 +376,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
       // Filter out the current prefix from suggestions (case-insensitive)
       possibleSuggestions = possibleSuggestions.filter(s => s.toLowerCase() !== prefix.toLowerCase());
       setSuggestions(possibleSuggestions);
+      setSelectedSuggestionIndex(0); // Reset to first suggestion
       handleTextChange.displayToOriginal = displayToOriginal;
       if (possibleSuggestions.length > 0) {
         const cursorBounds = quill.getBounds(range.index);
@@ -1466,6 +1481,22 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
       // ignore
     }
   }, [speakerNames]);
+  // Persist speaker snippets when they change
+  useEffect(() => {
+    try {
+      localStorage.setItem('speaker_snippets', JSON.stringify(speakerSnippets));
+    } catch (e) {
+      // ignore
+    }
+  }, [speakerSnippets]);
+  // Persist speaker order when it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('speaker_order', JSON.stringify(speakerOrder));
+    } catch (e) {
+      // ignore
+    }
+  }, [speakerOrder]);
   useEffect(() => {
     try {
       localStorage.setItem('transcript_snippets_width', String(snippetsWidth));
@@ -1904,6 +1935,10 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     quill.root.addEventListener('contextmenu', handleEditorRightClick);
 
     quill.on('text-change', () => {
+      // Skip if we're processing nbsp replacement to avoid duplicate handling
+      if (quill.__isNbspReplacement) {
+        return;
+      }
       handleTextChange();
       const range = quill.getSelection();
       if (range) {
@@ -1912,8 +1947,11 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
           try { renderCursorOverlay(); } catch (e) {}
         }
       }
-      // Reset suggestion trigger after processing input
-      suggestionTriggerRef.current = false;
+      // Reset suggestion trigger after processing input - use microtask to ensure
+      // all text-change handlers (including nbsp replacement) have completed first
+      Promise.resolve().then(() => {
+        suggestionTriggerRef.current = false;
+      });
     });
 
     // Set fixed height and custom font
@@ -1957,6 +1995,11 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
         return;
       }
 
+      // Skip if we're already processing nbsp replacement
+      if (quill.__isNbspReplacement) {
+        return;
+      }
+
       const htmlContent = quill.root.innerHTML; // Get the content of the editor
       const updatedContent = htmlContent.replace(/&nbsp;/g, ' '); // Replace &nbsp; with spaces
 
@@ -1967,8 +2010,11 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
         const prevScrollTop = editorEl ? editorEl.scrollTop : null;
         
         // Disable history while making this change to avoid polluting undo stack
+        // Also set flag to prevent recursive text-change handling
         quill.history.ignoreChange = true;
+        quill.__isNbspReplacement = true;
         quill.root.innerHTML = updatedContent; // Update the content
+        quill.__isNbspReplacement = false;
         quill.history.ignoreChange = false;
         
         if (currentSelection) {
