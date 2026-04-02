@@ -452,6 +452,52 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     // Validation removed - user must click button to validate
   };
 
+  // Add timestamp and speaker label to the beginning of the next paragraph from cursor position
+  const addTimestampToNextParagraph = (timestamp, speakerNumber = 1) => {
+    if (!quillInstanceRef.current) return;
+    const quill = quillInstanceRef.current;
+    const range = quill.getSelection();
+    if (!range) return;
+
+    const fullText = quill.getText();
+    let cursorIndex = range.index;
+
+    // Find the start of the next paragraph (after \n\n or next line that starts text)
+    let nextParagraphStart = -1;
+    
+    // First, find end of current paragraph (look for \n\n or end of text)
+    let i = cursorIndex;
+    while (i < fullText.length) {
+      if (fullText[i] === '\n' && i + 1 < fullText.length && fullText[i + 1] === '\n') {
+        // Found paragraph break, next paragraph starts after all newlines
+        let j = i + 2;
+        while (j < fullText.length && fullText[j] === '\n') j++;
+        if (j < fullText.length) {
+          nextParagraphStart = j;
+        }
+        break;
+      } else if (fullText[i] === '\n' && i + 1 < fullText.length && fullText[i + 1] !== '\n') {
+        // Single newline - next line starts right after
+        nextParagraphStart = i + 1;
+        break;
+      }
+      i++;
+    }
+
+    if (nextParagraphStart === -1) {
+      // No next paragraph found, we're at the end
+      return;
+    }
+
+    // Insert the timestamp at the start of the next paragraph
+    const formattedTimestamp = `${timestamp} S${speakerNumber}: `;
+    quill.insertText(nextParagraphStart, formattedTimestamp, 'user');
+
+    // Highlight the speaker number digit for easy editing
+    const speakerNumberPos = nextParagraphStart + timestamp.length + 2; // Position of digit after "S"
+    quill.setSelection(speakerNumberPos, 1);
+  };
+
   // Split paragraph at cursor, insert timestamp, and move text after cursor to a new paragraph.
   // Always uses the configured speaker number (no increment). Highlights the speaker number for editing.
   const splitParagraphWithTimestamp = (timestamp, speakerNumber = 1) => {
@@ -1423,6 +1469,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     insertTimestamp,
     insertTimestampForced,
     splitParagraphWithTimestamp,
+    addTimestampToNextParagraph,
     isCursorAtStartOfParagraph,
     findAndHighlight,
     replaceText,

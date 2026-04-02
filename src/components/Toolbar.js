@@ -29,6 +29,13 @@ const Toolbar = ({
   currentTime,
   onGetTimestamp,
   onInsertTimestamp,
+  onAddTimestampToNextParagraph,
+  // Alternating speakers
+  useAlternatingSpeakers,
+  setUseAlternatingSpeakers,
+  alternatingSpeakers,
+  setAlternatingSpeakers,
+  resetAlternatingSpeakerIndex,
   // Right-Ctrl timestamp behavior props (optional)
   rightCtrlInsertProper,
   setRightCtrlInsertProper,
@@ -217,6 +224,14 @@ const Toolbar = ({
         <MdMoreTime size={21} />
       </button>
 
+      {/* Add timestamp to next paragraph icon */}
+      <button onClick={onAddTimestampToNextParagraph} className="text-gray-600 p-1 hover:text-blue-500" title="Add timestamp to next paragraph">
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 5v14M5 12l7 7 7-7"/>
+          <rect x="3" y="3" width="4" height="4" rx="1"/>
+        </svg>
+      </button>
+
       {/* Increase font icon */}
       <button onClick={increaseFontSize} className="text-gray-600 p-1 hover:text-blue-500" title="Increase font">
         <FiZoomIn size={21} />
@@ -353,6 +368,47 @@ const Toolbar = ({
                 className="ml-2 w-16 text-sm px-1 py-0.5 border rounded"
                 title="Speaker number (S#)"
               />
+            </div>
+            {/* Alternating speakers option */}
+            <div className="px-6 py-3 text-[12px] hover:bg-gray-100">
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={!!useAlternatingSpeakers}
+                  onChange={(e) => {
+                    if (typeof setUseAlternatingSpeakers === 'function') setUseAlternatingSpeakers(e.target.checked);
+                  }}
+                  className="mr-3"
+                  id="alternating-speakers-toggle"
+                />
+                <label htmlFor="alternating-speakers-toggle" className="cursor-pointer">
+                  Alternate speakers
+                </label>
+              </div>
+              {useAlternatingSpeakers && (
+                <div className="mt-2 ml-6 flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={(alternatingSpeakers || []).join(', ')}
+                    onChange={(e) => {
+                      const nums = e.target.value.split(',').map(s => parseInt(s.trim(), 10)).filter(n => Number.isFinite(n) && n > 0);
+                      if (typeof setAlternatingSpeakers === 'function') setAlternatingSpeakers(nums.length > 0 ? nums : [1]);
+                    }}
+                    className="w-24 text-sm px-2 py-1 border rounded"
+                    placeholder="1, 2"
+                    title="Speaker numbers to alternate (e.g., 1, 2)"
+                  />
+                  <button
+                    onClick={() => {
+                      if (typeof resetAlternatingSpeakerIndex === 'function') resetAlternatingSpeakerIndex();
+                    }}
+                    className="text-xs px-2 py-1 bg-gray-200 hover:bg-gray-300 rounded"
+                    title="Reset to first speaker"
+                  >
+                    Reset
+                  </button>
+                </div>
+              )}
             </div>
             {/* Swap Speaker Labels Option */}
             <button

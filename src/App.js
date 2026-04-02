@@ -44,6 +44,24 @@ function App() {
     }
   });
 
+  // Alternating speakers for "Add timestamp to next paragraph" feature
+  const [useAlternatingSpeakers, setUseAlternatingSpeakers] = useState(() => {
+    try {
+      return localStorage.getItem('useAlternatingSpeakers') === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
+  const [alternatingSpeakers, setAlternatingSpeakers] = useState(() => {
+    try {
+      const saved = localStorage.getItem('alternatingSpeakers');
+      return saved ? JSON.parse(saved) : [1, 2];
+    } catch (e) {
+      return [1, 2];
+    }
+  });
+  const alternatingSpeakerIndexRef = useRef(0);
+
   // State for trigger buttons
   const [showSpeakerSnippets, setShowSpeakerSnippets] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
@@ -168,6 +186,27 @@ function App() {
   const insertTimestamp = useCallback((timestamp, speakerNumber) => editorRef.current?.insertTimestamp(timestamp, speakerNumber), []);
   const insertTimestampForced = useCallback((timestamp, speakerNumber) => editorRef.current?.insertTimestampForced?.(timestamp, speakerNumber), []);
   const splitParagraphWithTimestamp = useCallback((timestamp, speakerNumber) => editorRef.current?.splitParagraphWithTimestamp?.(timestamp, speakerNumber), []);
+  const addTimestampToNextParagraph = useCallback((timestamp, speakerNumber) => editorRef.current?.addTimestampToNextParagraph?.(timestamp, speakerNumber), []);
+
+  // Handler for toolbar button - adds timestamp to next paragraph
+  const handleAddTimestampToNextParagraph = useCallback(() => {
+    const timestamp = getTimestamp();
+    if (timestamp) {
+      let speakerNum;
+      if (useAlternatingSpeakers && alternatingSpeakers.length > 0) {
+        speakerNum = alternatingSpeakers[alternatingSpeakerIndexRef.current];
+        alternatingSpeakerIndexRef.current = (alternatingSpeakerIndexRef.current + 1) % alternatingSpeakers.length;
+      } else {
+        speakerNum = rightCtrlSpeaker;
+      }
+      addTimestampToNextParagraph(timestamp, speakerNum);
+    }
+  }, [getTimestamp, addTimestampToNextParagraph, rightCtrlSpeaker, useAlternatingSpeakers, alternatingSpeakers]);
+
+  // Reset alternating speaker index
+  const resetAlternatingSpeakerIndex = useCallback(() => {
+    alternatingSpeakerIndexRef.current = 0;
+  }, []);
 
   // Function to download the transcript
   const downloadTranscript = () => {
@@ -348,6 +387,18 @@ function App() {
       localStorage.setItem('rightCtrlSpeaker', String(rightCtrlSpeaker));
     } catch (e) {}
   }, [rightCtrlSpeaker]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('useAlternatingSpeakers', useAlternatingSpeakers ? 'true' : 'false');
+    } catch (e) {}
+  }, [useAlternatingSpeakers]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('alternatingSpeakers', JSON.stringify(alternatingSpeakers));
+    } catch (e) {}
+  }, [alternatingSpeakers]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -620,6 +671,13 @@ function App() {
             currentTime={currentTime}
             onGetTimestamp={getTimestamp}
             onInsertTimestamp={insertTimestamp}
+            onAddTimestampToNextParagraph={handleAddTimestampToNextParagraph}
+            // Alternating speakers
+            useAlternatingSpeakers={useAlternatingSpeakers}
+            setUseAlternatingSpeakers={setUseAlternatingSpeakers}
+            alternatingSpeakers={alternatingSpeakers}
+            setAlternatingSpeakers={setAlternatingSpeakers}
+            resetAlternatingSpeakerIndex={resetAlternatingSpeakerIndex}
             // Right-Ctrl timestamp behavior
             rightCtrlInsertProper={rightCtrlInsertProper}
             setRightCtrlInsertProper={setRightCtrlInsertProper}
