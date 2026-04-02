@@ -112,6 +112,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
   });
 
   const contextMenuRef = useRef(null);
+  const contextMenuSelectionRef = useRef(null); // Store selection range when context menu opens
 
   const lastMenuOpenTimeRef = useRef(0);
 
@@ -1050,6 +1051,8 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     if (timestampMatch || showGoogle || showSwapSpeaker || showSpeakerSnips) {
       e.preventDefault();
       lastMenuOpenTimeRef.current = Date.now();
+      // Store the selection range for use in context menu actions
+      contextMenuSelectionRef.current = range.length > 0 ? { index: range.index, length: range.length } : null;
       setContextMenu({
         visible: true,
         x: e.clientX,
@@ -1076,14 +1079,19 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     } else if (action === 'swapSpeaker' && contextMenu.selectedText && onRequestSwapModal) {
       onRequestSwapModal(contextMenu.selectedText);
     } else if (action === 'speakerSnippets') {
-      const { snippets, order } = buildSpeakerSnippets();
-      setSpeakerSnippets(snippets);
-      setSpeakerOrder(order);
+      // Only build snippets if none exist, otherwise show existing
+      if (Object.keys(speakerSnippets).length === 0) {
+        const { snippets, order } = buildSpeakerSnippets();
+        setSpeakerSnippets(snippets);
+        setSpeakerOrder(order);
+      }
       setShowSpeakerSnippets(true);
     } else if (action === 'joinParagraphs') {
       joinParagraphs();
     } else if (action === 'removeActiveListeningCues') {
       removeActiveListeningCues();
+    } else if (action === 'stripTimestamps') {
+      stripTimestampsSpeakers();
     }
     setSuggestions([]);
     setContextMenu({ visible: false, x: 0, y: 0, timestamp: null, clickIndex: 0, selectedText: '', showGoogle: false, showPlay: false, showSwapSpeaker: false });
@@ -1439,9 +1447,12 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     adjustTimestamps,
     // Expose trigger functions and state
     toggleSpeakerSnippets: () => {
-      const { snippets, order } = buildSpeakerSnippets();
-      setSpeakerSnippets(snippets);
-      setSpeakerOrder(order);
+      // Only build snippets if none exist, otherwise show existing
+      if (Object.keys(speakerSnippets).length === 0) {
+        const { snippets, order } = buildSpeakerSnippets();
+        setSpeakerSnippets(snippets);
+        setSpeakerOrder(order);
+      }
       setShowSpeakerSnippets(v => !v);
     },
     toggleNotes: () => setShowNotes(v => !v),
@@ -2447,6 +2458,28 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     quill.setText(cleanedContent);
   };
 
+  // Strip timestamps and speaker IDs from highlighted text
+  const stripTimestampsSpeakers = () => {
+    if (!quillInstanceRef.current) return;
+    // Use stored selection range from when context menu opened
+    const range = contextMenuSelectionRef.current;
+    if (!range || range.length === 0) return;
+    const selectedText = quillInstanceRef.current.getText(range.index, range.length);
+    
+    // Pattern to match timestamp and speaker ID: "0:28:21.1 S4: " or similar formats
+    // Handles: H:MM:SS.d S#: or HH:MM:SS.d S#: at the start of lines or paragraphs
+    // More permissive pattern: any digits with colons/dots followed by speaker label
+    const pattern = /\d{1,2}:\d{2}:\d{2}(?:\.\d+)?\s+S(?:\d+|\?):\s*/g;
+    
+    // Remove all timestamp+speaker prefixes
+    const cleaned = selectedText.replace(pattern, '').trim();
+    
+    // Replace the selected text with the cleaned version
+    quillInstanceRef.current.deleteText(range.index, range.length);
+    quillInstanceRef.current.insertText(range.index, cleaned);
+    quillInstanceRef.current.setSelection(range.index + cleaned.length, 0);
+  };
+
   // Adjust timestamps by adding or subtracting seconds from selected/highlighted timestamps
   const adjustTimestamps = (secondsToAdjust) => {
     if (!quillInstanceRef.current) return;
@@ -2606,9 +2639,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
                         const v = parseInt(e.target.value, 10);
                         setSnippetCount(v);
                         localStorage.setItem('snippet_count', String(v));
-                        const { snippets, order } = buildSpeakerSnippets();
-                        setSpeakerSnippets(snippets);
-                        setSpeakerOrder(order);
+                        // Don't auto-rebuild - user can click Rebuild if they want
                       }}
                     >
                       <option value={1}>1</option>
@@ -2851,6 +2882,17 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
                 <path d="M4 12h16M12 4v16" />
               </svg>
               Join Paragraphs
+            </div>
+          )}
+          {contextMenu.selectedText && (
+            <div
+              className="px-4 py-2 hover:bg-orange-50 cursor-pointer text-sm font-medium text-gray-700 flex items-center"
+              onClick={() => handleContextMenuClick('stripTimestamps')}
+            >
+              <svg className="w-4 h-4 mr-2 text-orange-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              Strip Timestamps/Speakers
             </div>
           )}
           {contextMenu.showSpeakerSnippets && (
