@@ -497,17 +497,16 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     const speakerNumberPos = nextParagraphStart + timestamp.length + 2; // Position of digit after "S"
     quill.setSelection(speakerNumberPos, 1);
 
-    // Scroll to center the paragraph if it's near the bottom of the viewport
+    // Scroll to bring the paragraph to the top of the viewport if it's near the bottom
     const editorEl = editorRef.current?.querySelector('.ql-editor');
     if (editorEl) {
       const bounds = quill.getBounds(nextParagraphStart);
-      const editorRect = editorEl.getBoundingClientRect();
       const viewportHeight = editorEl.clientHeight;
       const cursorRelativeTop = bounds.top;
       
-      // If the paragraph is in the lower half of the viewport, scroll to center it
+      // If the paragraph is in the lower half of the viewport, scroll to bring it to the top
       if (cursorRelativeTop > viewportHeight / 2) {
-        const scrollTarget = editorEl.scrollTop + cursorRelativeTop - viewportHeight / 2;
+        const scrollTarget = editorEl.scrollTop + cursorRelativeTop - 50; // 50px padding from top
         editorEl.scrollTo({ top: scrollTarget, behavior: 'smooth' });
       }
     }
