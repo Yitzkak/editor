@@ -496,6 +496,21 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     // Highlight the speaker number digit for easy editing
     const speakerNumberPos = nextParagraphStart + timestamp.length + 2; // Position of digit after "S"
     quill.setSelection(speakerNumberPos, 1);
+
+    // Scroll to center the paragraph if it's near the bottom of the viewport
+    const editorEl = editorRef.current?.querySelector('.ql-editor');
+    if (editorEl) {
+      const bounds = quill.getBounds(nextParagraphStart);
+      const editorRect = editorEl.getBoundingClientRect();
+      const viewportHeight = editorEl.clientHeight;
+      const cursorRelativeTop = bounds.top;
+      
+      // If the paragraph is in the lower half of the viewport, scroll to center it
+      if (cursorRelativeTop > viewportHeight / 2) {
+        const scrollTarget = editorEl.scrollTop + cursorRelativeTop - viewportHeight / 2;
+        editorEl.scrollTo({ top: scrollTarget, behavior: 'smooth' });
+      }
+    }
   };
 
   // Split paragraph at cursor, insert timestamp, and move text after cursor to a new paragraph.
