@@ -3,6 +3,7 @@ import Quill from 'quill';
 import 'quill/dist/quill.snow.css';
 import Fuse from 'fuse.js';
 import AdjustTimestampModal from './AdjustTimestampModal';
+import FixTimestampsModal from './FixTimestampsModal';
 
 const predefinedWords = [
   'Objection, form.', 
@@ -184,6 +185,10 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
   // Adjust Timestamp state
   const [showAdjustTimestamp, setShowAdjustTimestamp] = useState(false);
   const adjustTimestampRangeRef = useRef(null);
+
+  // Fix Timestamps state
+  const [showFixTimestamps, setShowFixTimestamps] = useState(false);
+  const fixTimestampRangeRef = useRef(null);
 
   // Find & Replace state
   const [showFindReplace, setShowFindReplace] = useState(false);
@@ -2581,6 +2586,44 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     quill.setSelection(range.index, adjustedText.length);
   };
 
+  // Fix bad timestamps in the selected text.
+  // Bad format 1: "MM:SS.d S#:"  → prepend the user-supplied hour → "H:MM:SS.d S#:"
+  // Bad format 2: "MM:SS S#:"    → prepend hour AND append a random decimal digit → "H:MM:SS.r S#:"
+  // Each bad timestamp receives an independently generated random digit (0–9).
+  const fixTimestamps = (hourNumber) => {
+    if (!quillInstanceRef.current) return;
+    const quill = quillInstanceRef.current;
+
+    const range = fixTimestampRangeRef.current;
+    if (!range || range.length === 0) {
+      alert('Please select text containing timestamps first.');
+      return;
+    }
+
+    const selectedText = quill.getText(range.index, range.length);
+
+    // Match timestamps that have exactly ONE colon (MM:SS or MM:SS.d) followed by a speaker label.
+    // We use a negative lookbehind to avoid matching the SS part of a valid H:MM:SS timestamp.
+    const fixedText = selectedText.replace(
+      /(?<![:\d])(\d{1,2}:\d{2}(?:\.\d+)?)(\s+)(S[^:\s]+:)/g,
+      (match, timestamp, space, speaker) => {
+        const hasDec = timestamp.includes('.');
+        if (hasDec) {
+          // Bad format 1 — just needs the hour prefix
+          return `${hourNumber}:${timestamp}${space}${speaker}`;
+        } else {
+          // Bad format 2 — needs hour prefix and a random decimal digit
+          const randomDec = Math.floor(Math.random() * 10);
+          return `${hourNumber}:${timestamp}.${randomDec}${space}${speaker}`;
+        }
+      }
+    );
+
+    quill.deleteText(range.index, range.length);
+    quill.insertText(range.index, fixedText);
+    quill.setSelection(range.index, fixedText.length);
+  };
+
   // Build speaker snippets from paragraphs
   const buildSpeakerSnippets = () => {
     if (!quillInstanceRef.current) return { snippets: {}, order: [] };
@@ -3420,6 +3463,28 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
               <path d="M12 6v6l4 2" />
             </svg>
           </button>
+          {/* Fix Timestamps */}
+          <button
+            className={`w-8 h-8 flex items-center justify-center rounded-lg shadow transition-colors ${showFixTimestamps ? 'bg-amber-500 text-white' : 'bg-white text-amber-500 hover:bg-amber-100'}`}
+            title="Fix Timestamps (add missing hour / decimal)"
+            onClick={() => {
+              if (quillInstanceRef.current) {
+                const range = quillInstanceRef.current.getSelection();
+                if (range && range.length > 0) {
+                  fixTimestampRangeRef.current = { index: range.index, length: range.length };
+                  setShowFixTimestamps(true);
+                } else {
+                  alert('Please select text containing timestamps first.');
+                }
+              }
+            }}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 6v6l4 2" />
+              <path d="M9 9l6 6M15 9l-6 6" />
+            </svg>
+          </button>
           {/* Join Same Speaker Paragraphs */}
         <button
           className="w-8 h-8 flex items-center justify-center rounded-lg shadow bg-white text-indigo-500 hover:bg-indigo-100"
@@ -3464,6 +3529,16 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
           adjustTimestampRangeRef.current = null;
         }}
         onAdjust={adjustTimestamps}
+      />
+
+      {/* Fix Timestamps Modal */}
+      <FixTimestampsModal
+        isOpen={showFixTimestamps}
+        onClose={() => {
+          setShowFixTimestamps(false);
+          fixTimestampRangeRef.current = null;
+        }}
+        onFix={fixTimestamps}
       />
     </div>
   </div>
