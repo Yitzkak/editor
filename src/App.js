@@ -32,6 +32,13 @@ function App() {
       return true;
     }
   });
+  const [autoCapEllipsisEnabled, setAutoCapEllipsisEnabled] = useState(() => {
+    try {
+      return localStorage.getItem('autoCapEllipsisEnabled') !== 'false';
+    } catch (e) {
+      return true;
+    }
+  });
   const [performanceMode, setPerformanceMode] = useState(false); // Hide waveform for >3h files
   // Right-Ctrl timestamp behavior: when true, pressing Right Control inserts a proper timestamp S# regardless of cursor
   const [rightCtrlInsertProper, setRightCtrlInsertProper] = useState(() => {
@@ -408,14 +415,10 @@ function App() {
   }, [autoCapitalizationEnabled]);
 
   useEffect(() => {
-    if (!autoCapitalizationEnabled) return;
-    const interval = setInterval(() => {
-      if (editorRef.current?.formatTitleCase) {
-        editorRef.current.formatTitleCase();
-      }
-    }, 60 * 1000);
-    return () => clearInterval(interval);
-  }, [autoCapitalizationEnabled]);
+    try {
+      localStorage.setItem('autoCapEllipsisEnabled', autoCapEllipsisEnabled ? 'true' : 'false');
+    } catch (e) {}
+  }, [autoCapEllipsisEnabled]);
 
   useEffect(() => {
     try {
@@ -738,6 +741,8 @@ function App() {
             setAutosuggestionEnabled={setAutosuggestionEnabled}
             autoCapitalizationEnabled={autoCapitalizationEnabled}
             setAutoCapitalizationEnabled={setAutoCapitalizationEnabled}
+            autoCapEllipsisEnabled={autoCapEllipsisEnabled}
+            setAutoCapEllipsisEnabled={setAutoCapEllipsisEnabled}
           />
         </div>
 
@@ -750,6 +755,8 @@ function App() {
             onTranscriptChange={handleTranscriptChange}
             onRequestSwapModal={handleRequestSwapModal}
             autosuggestionEnabled={autosuggestionEnabled}
+            autoCapitalizationEnabled={autoCapitalizationEnabled}
+            autoCapEllipsisEnabled={autoCapEllipsisEnabled}
             onRequestPlayRange={handleRequestPlayRange}
             onRequestStop={handleRequestStop}
           />

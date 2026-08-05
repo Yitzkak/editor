@@ -70,6 +70,8 @@ const Toolbar = ({
   setAutosuggestionEnabled,
   autoCapitalizationEnabled,
   setAutoCapitalizationEnabled,
+  autoCapEllipsisEnabled,
+  setAutoCapEllipsisEnabled,
   onFixTranscript,
   onJoinParagraphs,
   onRemoveActiveListeningCues,
@@ -344,7 +346,7 @@ const Toolbar = ({
 
         {/* Dropdown menu */}
         {dropdownOpen && (
-          <div ref={dropdownRef} className="absolute right-0 mt-2 w-56 bg-white border rounded-lg shadow-lg z-50 py-3">
+          <div ref={dropdownRef} className="absolute right-0 mt-2 w-56 bg-white border rounded-lg shadow-lg z-50 py-3 max-h-96 overflow-y-auto">
             {/* Right-Ctrl timestamp option */}
             <div className="flex items-center w-full px-6 py-3 text-[12px] hover:bg-gray-100">
               <input
@@ -468,7 +470,20 @@ const Toolbar = ({
                 id="auto-capitalization-toggle"
               />
               <label htmlFor="auto-capitalization-toggle" className="cursor-pointer">
-                Auto-Capitalize (every 1 min)
+                Auto-Capitalize after . ? ! (every 1 min)
+              </label>
+            </div>
+            {/* Auto-capitalize after ellipsis toggle */}
+            <div className="flex items-center w-full px-6 py-4 text-[12px] hover:bg-gray-100">
+              <input
+                type="checkbox"
+                checked={!!autoCapEllipsisEnabled}
+                onChange={e => setAutoCapEllipsisEnabled(e.target.checked)}
+                className="mr-3"
+                id="auto-cap-ellipsis-toggle"
+              />
+              <label htmlFor="auto-cap-ellipsis-toggle" className="cursor-pointer">
+                Auto-Capitalize after ... (every 1 min)
               </label>
             </div>
             <button

@@ -40,7 +40,7 @@ const metaTagShortcuts = {
   'ap': '[applause]',
 };
 
-const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onRequestSwapModal, autosuggestionEnabled, onRequestPlayRange, onRequestStop }, ref) => {
+const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onRequestSwapModal, autosuggestionEnabled, autoCapitalizationEnabled = true, autoCapEllipsisEnabled = true, onRequestPlayRange, onRequestStop }, ref) => {
   const editorRef = useRef(null);
   const quillInstanceRef = useRef(null); // Store Quill instance here
   const [highlightedText, setHighlightedText] = useState('');
@@ -2148,16 +2148,48 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fontSize, autosuggestionEnabled]);
 
-  // Add this useEffect to auto-run capitalization every 1 minute
+  // Auto-capitalization interval — respects the two toggle props
   useEffect(() => {
+    if (!autoCapitalizationEnabled && !autoCapEllipsisEnabled) return;
     const interval = setInterval(() => {
-      if (quillInstanceRef.current) {
-        formatTitleCase();
+      if (!quillInstanceRef.current) return;
+      const quill = quillInstanceRef.current;
+      const currentSelection = quill.getSelection();
+      const editorEl = editorRef.current?.querySelector('.ql-editor');
+      const prevScrollTop = editorEl ? editorEl.scrollTop : null;
+      const content = quill.getText();
+      const lines = content.split(/(\r?\n)/);
+      const transformedLines = lines.map(line => {
+        if (/^\r?\n$/.test(line)) return line;
+        let processed = line;
+        // Always capitalize after timestamp+speaker label
+        processed = processed.replace(/((\d{1,2}:){2}\d{1,2}(?:\.\d+)?\s+S[^:\s]+:\s*)([a-zA-Z])/, (m, p1, _p2, p3) => p1 + p3.toUpperCase());
+        if (autoCapEllipsisEnabled) {
+          processed = processed.replace(/(\.\.\.\ s+)([a-zA-Z])/g, (m, p1, p2) => p1 + p2.toUpperCase());
+          processed = processed.replace(/(\.\.\.\s+)([a-zA-Z])/g, (m, p1, p2) => p1 + p2.toUpperCase());
+          processed = processed.replace(/(…\s+)([a-zA-Z])/g, (m, p1, p2) => p1 + p2.toUpperCase());
+        }
+        if (autoCapitalizationEnabled) {
+          processed = processed.replace(/(?<!\.)([.!?]\s+)([a-zA-Z])/g, (m, p1, p2) => p1 + p2.toUpperCase());
+          processed = processed.replace(/(^\s*[a-zA-Z])/, m => m.toUpperCase());
+        }
+        return processed;
+      });
+      const transformedText = transformedLines.join('');
+      if (transformedText === content) return;
+      quill.setText(transformedText, 'silent');
+      if (currentSelection) {
+        const newLength = quill.getLength();
+        const index = Math.min(currentSelection.index, newLength - 1);
+        quill.setSelection(index, currentSelection.length || 0, 'silent');
       }
-    }, 60000); // 60,000 ms = 1 minute
+      if (editorEl && prevScrollTop !== null) {
+        editorEl.scrollTop = prevScrollTop;
+      }
+    }, 60000);
     return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoCapitalizationEnabled, autoCapEllipsisEnabled]);
 
   // Handle Ctrl+K replace mode: replace all occurrences as user types
   useEffect(() => {
