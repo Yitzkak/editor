@@ -68,6 +68,8 @@ const Toolbar = ({
   onFixCapitalization,
   autosuggestionEnabled,
   setAutosuggestionEnabled,
+  autoCapitalizationEnabled,
+  setAutoCapitalizationEnabled,
   onFixTranscript,
   onJoinParagraphs,
   onRemoveActiveListeningCues,
@@ -454,6 +456,19 @@ const Toolbar = ({
               />
               <label htmlFor="autosuggestion-toggle" className="cursor-pointer">
                 Enable Autosuggestion
+              </label>
+            </div>
+            {/* Auto-capitalization toggle */}
+            <div className="flex items-center w-full px-6 py-4 text-[12px] hover:bg-gray-100">
+              <input
+                type="checkbox"
+                checked={!!autoCapitalizationEnabled}
+                onChange={e => setAutoCapitalizationEnabled(e.target.checked)}
+                className="mr-3"
+                id="auto-capitalization-toggle"
+              />
+              <label htmlFor="auto-capitalization-toggle" className="cursor-pointer">
+                Auto-Capitalize (every 1 min)
               </label>
             </div>
             <button

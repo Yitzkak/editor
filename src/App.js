@@ -25,6 +25,13 @@ function App() {
   const [wholeWord, setWholeWord] = useState(true);
   const [audioLoading, setAudioLoading] = useState(false);
   const [autosuggestionEnabled, setAutosuggestionEnabled] = useState(true);
+  const [autoCapitalizationEnabled, setAutoCapitalizationEnabled] = useState(() => {
+    try {
+      return localStorage.getItem('autoCapitalizationEnabled') !== 'false';
+    } catch (e) {
+      return true;
+    }
+  });
   const [performanceMode, setPerformanceMode] = useState(false); // Hide waveform for >3h files
   // Right-Ctrl timestamp behavior: when true, pressing Right Control inserts a proper timestamp S# regardless of cursor
   const [rightCtrlInsertProper, setRightCtrlInsertProper] = useState(() => {
@@ -396,6 +403,22 @@ function App() {
 
   useEffect(() => {
     try {
+      localStorage.setItem('autoCapitalizationEnabled', autoCapitalizationEnabled ? 'true' : 'false');
+    } catch (e) {}
+  }, [autoCapitalizationEnabled]);
+
+  useEffect(() => {
+    if (!autoCapitalizationEnabled) return;
+    const interval = setInterval(() => {
+      if (editorRef.current?.formatTitleCase) {
+        editorRef.current.formatTitleCase();
+      }
+    }, 60 * 1000);
+    return () => clearInterval(interval);
+  }, [autoCapitalizationEnabled]);
+
+  useEffect(() => {
+    try {
       localStorage.setItem('alternatingSpeakers', JSON.stringify(alternatingSpeakers));
     } catch (e) {}
   }, [alternatingSpeakers]);
@@ -713,6 +736,8 @@ function App() {
             onRemoveFillers={handleRemoveFillers}
             autosuggestionEnabled={autosuggestionEnabled}
             setAutosuggestionEnabled={setAutosuggestionEnabled}
+            autoCapitalizationEnabled={autoCapitalizationEnabled}
+            setAutoCapitalizationEnabled={setAutoCapitalizationEnabled}
           />
         </div>
 
