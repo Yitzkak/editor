@@ -2,6 +2,8 @@ import React, { useEffect, useState, useRef, useImperativeHandle, forwardRef, us
 import Quill from 'quill';
 import 'quill/dist/quill.snow.css';
 import Fuse from 'fuse.js';
+import { HiOutlineArrowUp } from 'react-icons/hi';
+import { IoClose, IoAdd } from 'react-icons/io5';
 import AdjustTimestampModal from './AdjustTimestampModal';
 import FixTimestampsModal from './FixTimestampsModal';
 
@@ -40,7 +42,7 @@ const metaTagShortcuts = {
   'ap': '[applause]',
 };
 
-const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onRequestSwapModal, autosuggestionEnabled, autoCapitalizationEnabled = true, autoCapEllipsisEnabled = true, onRequestPlayRange, onRequestStop }, ref) => {
+const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onRequestSwapModal, autosuggestionEnabled, autoCapitalizationEnabled = true, autoCapEllipsisEnabled = true, onRequestPlayRange, onRequestStop, onToggleSpeakerNames, speakerMappings = [], setSpeakerMappings, onApplySpeakerNames }, ref) => {
   const editorRef = useRef(null);
   const quillInstanceRef = useRef(null); // Store Quill instance here
   const [highlightedText, setHighlightedText] = useState('');
@@ -198,6 +200,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
   const [caseSensitive, setCaseSensitive] = useState(false);
   const [wholeWord, setWholeWord] = useState(true);
   const [showHighlightRepeated, setShowHighlightRepeated] = useState(false);
+  const [showSpeakerNames, setShowSpeakerNames] = useState(false);
   const repeatedPositionsRef = useRef([]); // stores { index, length }
   const [currentRepeatedIndex, setCurrentRepeatedIndex] = useState(0);
   const [replaceMode, setReplaceMode] = useState(null); // { selectedText, range } or null
@@ -1501,7 +1504,18 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
     highlightRepeatedSpeakers,
     setText: (text) => {
       if (quillInstanceRef.current) {
-        quillInstanceRef.current.setText(text);
+        // Use 'user' source so formatting changes are captured in undo history
+        quillInstanceRef.current.setText(text, 'user');
+      }
+    },
+    undo: () => {
+      if (quillInstanceRef.current?.history) {
+        quillInstanceRef.current.history.undo();
+      }
+    },
+    redo: () => {
+      if (quillInstanceRef.current?.history) {
+        quillInstanceRef.current.history.redo();
       }
     },
     formatTitleCase, // Expose the function
@@ -3111,7 +3125,7 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
         </div>
       )}
       </div>
-      {(showFindReplace || showNotes || showInvalidList) && (
+      {(showFindReplace || showNotes || showInvalidList || showSpeakerNames) && (
         <div
           className="flex h-full flex-col border-l bg-white"
           style={{ width: stackedPanelWidth || undefined }}
@@ -3272,6 +3286,53 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
                 ) : (
                   <div className="text-sm text-gray-500">No invalid timestamps</div>
                 )}
+              </div>
+            </div>
+          )}
+          {showSpeakerNames && speakerMappings && (
+            <div className="flex flex-col h-full border-t">
+              <div className="px-3 pt-3 pb-2 text-xs font-semibold text-gray-600 border-b flex items-center justify-between">
+                <span>Speaker Names</span>
+                <button onClick={() => setShowSpeakerNames(false)} className="text-gray-400 hover:text-gray-600">
+                  <IoClose size={14} />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-3">
+                {speakerMappings.map((m, i) => {
+                  const isFirst = i === 0;
+                  const isLast = i === speakerMappings.length - 1;
+                  return (
+                    <div key={i} className="flex items-center gap-2">
+                      <span className="w-8 text-xs font-semibold text-gray-500 text-right flex-shrink-0">{m.label}:</span>
+                      <input
+                        type="text"
+                        value={m.name}
+                        onChange={e => setSpeakerMappings(prev => { const u = [...prev]; u[i] = { ...u[i], name: e.target.value }; return u; })}
+                        placeholder={`Speaker ${i + 1}`}
+                        className="flex-1 min-w-0 px-2 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 text-gray-800 placeholder-gray-400"
+                      />
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        {!isFirst && (
+                          <button onClick={() => setSpeakerMappings(prev => { const n = [...prev]; [n[i-1], n[i]] = [n[i], n[i-1]]; return n; })} className="text-indigo-400 hover:text-indigo-600" title="Move up"><HiOutlineArrowUp size={13} /></button>
+                        )}
+                        {speakerMappings.length > 1 && (
+                          <button onClick={() => setSpeakerMappings(prev => prev.filter((_,j) => j !== i).map((x,j) => ({ ...x, label: `S${j+1}` })))} className="text-red-400 hover:text-red-600" title="Remove"><IoClose size={14} /></button>
+                        )}
+                        {isLast && (
+                          <button onClick={() => setSpeakerMappings(prev => [...prev, { label: `S${prev.length+1}`, name: '' }])} className="text-indigo-400 hover:text-indigo-600" title="Add"><IoAdd size={15} /></button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="px-3 pb-3">
+                <button
+                  onClick={onApplySpeakerNames}
+                  className="w-full py-2 bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-semibold rounded-lg transition-colors"
+                >
+                  Update Speaker Names
+                </button>
               </div>
             </div>
           )}
@@ -3538,6 +3599,17 @@ const Textarea = forwardRef(({ fontSize, transcript, onTranscriptChange, onReque
             <path d="M7 8h10M7 12h10m-5 4h5"/>
           </svg>
         </button>
+        {/* Speaker Names panel toggle */}
+        <button
+            className={`w-8 h-8 flex items-center justify-center rounded-lg shadow transition-colors ${showSpeakerNames ? 'bg-indigo-500 text-white' : 'bg-white text-indigo-500 hover:bg-indigo-100'}`}
+            title="Speaker Names"
+            onClick={() => setShowSpeakerNames(v => !v)}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <circle cx="12" cy="8" r="4"/>
+              <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+            </svg>
+          </button>
         {/* Find & Replace toggle */}
         <button
           className={`w-8 h-8 flex items-center justify-center rounded-lg shadow transition-colors ${showFindReplace ? 'bg-indigo-500 text-white' : 'bg-white text-indigo-500 hover:bg-indigo-100'}`}

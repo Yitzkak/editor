@@ -7,6 +7,7 @@ import FindReplaceModal from './components/FindReplaceModal';
 import SwapSpeakerModal from './components/SwapSpeakerModal';
 import VersionHistoryModal from './components/VersionHistoryModal';
 import HomePage from './components/HomePage';
+import FormattingToolbar from './components/FormattingToolbar';
 
 
 function App() {
@@ -100,6 +101,21 @@ function App() {
     return saved ? JSON.parse(saved) : [];
   });
   const [showVersionHistory, setShowVersionHistory] = useState(false);
+
+  // Formatting toolbar state
+  const [showFormattingToolbar, setShowFormattingToolbar] = useState(false);
+  const [formattingPosition, setFormattingPosition] = useState('below'); // 'below' | 'side'
+  const [customerInstructions, setCustomerInstructions] = useState(() => {
+    try { return localStorage.getItem('customerInstructions') || ''; } catch (e) { return ''; }
+  });
+  const [speakerMappings, setSpeakerMappings] = useState(() => {
+    try {
+      const saved = localStorage.getItem('speakerMappings');
+      return saved ? JSON.parse(saved) : [{ label: 'S1', name: '' }, { label: 'S2', name: '' }];
+    } catch (e) {
+      return [{ label: 'S1', name: '' }, { label: 'S2', name: '' }];
+    }
+  });
 
   const editorRef = useRef(null);
   const mediaPlayerRef = useRef(null);
@@ -620,6 +636,145 @@ function App() {
     }
   };
 
+  // Persist speakerMappings and customerInstructions to localStorage
+  useEffect(() => {
+    try { localStorage.setItem('speakerMappings', JSON.stringify(speakerMappings)); } catch (e) {}
+  }, [speakerMappings]);
+  useEffect(() => {
+    try { localStorage.setItem('customerInstructions', customerInstructions); } catch (e) {}
+  }, [customerInstructions]);
+
+  // Double space after sentence-ending punctuation (. ? !)
+  const handleDoubleSpaceSentences = () => {
+    if (!editorRef.current) return;
+    const text = editorRef.current.getText();
+    const transformed = text.replace(/([.?!])( )(?! )/g, (match, punct, space, offset, str) => {
+      if (punct === '.') {
+        // Skip decimal numbers: digit before period
+        if (offset > 0 && /\d/.test(str[offset - 1])) return match;
+        // Skip known abbreviations
+        const wordBefore = str.substring(0, offset).match(/[A-Za-z]+$/)?.[0] || '';
+        if (/^(Mr|Mrs|Ms|Dr|Prof|Jr|Sr|St|vs|etc|al|Inc|Corp|Ltd|Dept|est|approx|No|Vol|pp|Fig|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Oct|Nov|Dec|Mon|Tue|Wed|Thu|Fri|Sat|Sun|Ave|Blvd|Rd|Apt|Gov|Gen|Sgt|Lt|Col|Maj|Rev|Hon|Rep|Sen)$/i.test(wordBefore)) return match;
+        // Skip single letter (initials): J. or U.S.A.
+        if (/^[A-Za-z]$/.test(wordBefore)) return match;
+      }
+      return punct + '  ';
+    });
+    editorRef.current.setText(transformed);
+  };
+
+  // Double space after colon that follows a speaker label (ALL CAPS pattern)
+  const handleDoubleSpaceSpeakerColon = () => {
+    if (!editorRef.current) return;
+    const text = editorRef.current.getText();
+    // Match speaker labels (any capitalisation, with optional periods/spaces) followed by colon + single space
+    const transformed = text.replace(
+      /\b([A-Za-z][A-Za-z0-9]*(?:[\s.]+[A-Za-z0-9]+)*):( )(?! )/g,
+      (match, label, space) => `${label}:  `
+    );
+    editorRef.current.setText(transformed);
+  };
+
+  // Convert ... (ellipsis) between words to  --
+  const handleEllipsisToDash = () => {
+    if (!editorRef.current) return;
+    const text = editorRef.current.getText();
+    const transformed = text.replace(/\s*\.\.\.\s*/g, ' -- ');
+    editorRef.current.setText(transformed);
+  };
+
+  // Remove empty lines between paragraphs (collapse blank lines to a single newline)
+  const handleRemoveEmptyLines = () => {
+    if (!editorRef.current) return;
+    const text = editorRef.current.getText() || '';
+    const transformed = text.replace(/\n(?:[ \t]*\n)+/g, '\n');
+    if (transformed !== text) {
+      editorRef.current.setText(transformed);
+    }
+  };
+
+  // Apply speaker name mappings: replace labels like "S1:" with "REAL NAME:" throughout document
+  const handleApplySpeakerNames = () => {
+    if (!editorRef.current) return;
+    let text = editorRef.current.getText();
+    speakerMappings.forEach(({ label, name }) => {
+      if (label.trim() && name.trim()) {
+        const escaped = label.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        text = text.replace(new RegExp(`\\b${escaped}:`, 'g'), `${name.trim()}:`);
+      }
+    });
+    editorRef.current.setText(text);
+  };
+
+  // Convert blank timestamps "[0:35:22.9] ____" to (indiscernible)/(Indiscernible)
+  // Capitalize when it starts a sentence (start of text/line, after . ? !, or after a speaker label)
+  const replaceBlanksWithIndiscernible = (text) => {
+    const blankPattern = /\[\d{1,2}:\d{2}:\d{2}(?:\.\d+)?\]\s*_{2,}/g;
+    return text.replace(blankPattern, (match, offset, full) => {
+      const before = full.slice(0, offset);
+      const trimmedBefore = before.replace(/\s+$/, '');
+      let capitalize = false;
+      if (trimmedBefore.length === 0) {
+        capitalize = true;
+      } else if (/[.?!]$/.test(trimmedBefore)) {
+        capitalize = true;
+      } else {
+        // Start of spoken line after a speaker label (e.g. "0:01:00.0 S1:" or "Tess:")
+        const line = trimmedBefore.split('\n').pop() || '';
+        if (/^(?:\d{1,2}:\d{2}:\d{2}(?:\.\d+)?\s+)?(?:S(?:\d+|\?)|[A-Za-z][\w.\s]*):\s*$/.test(line)) {
+          capitalize = true;
+        }
+      }
+      return capitalize ? '(Indiscernible)' : '(indiscernible)';
+    });
+  };
+
+  const handleBlanksToIndiscernible = () => {
+    if (!editorRef.current) return;
+    const text = editorRef.current.getText() || '';
+    const transformed = replaceBlanksWithIndiscernible(text);
+    if (transformed !== text) {
+      editorRef.current.setText(transformed);
+    }
+  };
+
+  const handleUndo = () => {
+    editorRef.current?.undo?.();
+  };
+
+  const handleRedo = () => {
+    editorRef.current?.redo?.();
+  };
+
+  // Export transcript with speaker names applied and timestamps removed (does not modify editor)
+  const handleExportWithSpeakerNames = () => {
+    if (!editorRef.current) return;
+    let text = editorRef.current.getText() || '';
+
+    // Replace S1:/S2: etc. with mapped speaker names
+    speakerMappings.forEach(({ label, name }) => {
+      if (label.trim() && name.trim()) {
+        const escaped = label.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        text = text.replace(new RegExp(`\\b${escaped}:`, 'g'), `${name.trim()}:`);
+      }
+    });
+
+    // Strip line-start timestamps (e.g. "0:28:21.1 " before a speaker name)
+    text = text.replace(/(^|\n)\d{1,2}:\d{2}:\d{2}(?:\.\d+)?\s+/g, '$1');
+
+    // Convert blank timestamps to (indiscernible) with sentence casing
+    text = replaceBlanksWithIndiscernible(text);
+
+    const element = document.createElement('a');
+    const file = new Blob([text], { type: 'text/plain' });
+    element.href = URL.createObjectURL(file);
+    element.download = 'transcript.txt';
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+    URL.revokeObjectURL(element.href);
+  };
+
   // Add a handler to trigger highlightRepeatedSpeakers on the Textarea ref
   // eslint-disable-next-line no-unused-vars
   const handleHighlightRepeatedSpeakers = () => {
@@ -743,11 +898,36 @@ function App() {
             setAutoCapitalizationEnabled={setAutoCapitalizationEnabled}
             autoCapEllipsisEnabled={autoCapEllipsisEnabled}
             setAutoCapEllipsisEnabled={setAutoCapEllipsisEnabled}
+            showFormattingToolbar={showFormattingToolbar && formattingPosition === 'below'}
+            onToggleFormattingToolbar={() => {
+              setFormattingPosition('below');
+              setShowFormattingToolbar(v => formattingPosition === 'below' ? !v : true);
+            }}
           />
         </div>
 
-        {/* Textarea underneath the toolbar */}
-        <div className="w-full bg-white mt-4 relative flex-1 min-h-0">
+        {/* Formatting toolbar - shown below main toolbar when position is 'below' */}
+        {showFormattingToolbar && formattingPosition === 'below' && (
+          <div className="mt-2 w-full">
+            <FormattingToolbar
+              position="below"
+              onTogglePosition={() => setFormattingPosition('side')}
+              onDoubleSpaceSentences={handleDoubleSpaceSentences}
+              onDoubleSpaceSpeakerColon={handleDoubleSpaceSpeakerColon}
+              onEllipsisToDash={handleEllipsisToDash}
+              onBlanksToIndiscernible={handleBlanksToIndiscernible}
+              onRemoveEmptyLines={handleRemoveEmptyLines}
+              onUndo={handleUndo}
+              onRedo={handleRedo}
+              speakerMappings={speakerMappings}
+              setSpeakerMappings={setSpeakerMappings}
+              onApplySpeakerNames={handleApplySpeakerNames}
+              onExport={handleExportWithSpeakerNames}
+            />
+          </div>
+        )}
+        {/* Textarea */}
+        <div className="w-full mt-4 relative flex-1 min-h-0">
           <Textarea 
             ref={editorRef} 
             fontSize={fontSize} 
@@ -759,6 +939,9 @@ function App() {
             autoCapEllipsisEnabled={autoCapEllipsisEnabled}
             onRequestPlayRange={handleRequestPlayRange}
             onRequestStop={handleRequestStop}
+            speakerMappings={speakerMappings}
+            setSpeakerMappings={setSpeakerMappings}
+            onApplySpeakerNames={handleApplySpeakerNames}
           />
         </div>
 

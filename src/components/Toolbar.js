@@ -9,8 +9,8 @@ import { FiDownload, FiMoreHorizontal, FiZoomIn, FiZoomOut, FiSave, FiClock, FiR
 import { TbPlayerSkipBack, TbPlayerSkipForward, TbPlayerTrackNext, TbPlayerTrackPrev, TbVolume, TbVolume2 } from "react-icons/tb";
 import { PiPlayPauseBold } from "react-icons/pi";
 import { RiFindReplaceLine, RiFileUploadLine } from "react-icons/ri";
-import { MdMoreTime } from "react-icons/md";
-import { FaExchangeAlt, FaRegKeyboard  } from "react-icons/fa";
+import { MdMoreTime, MdOutlineFormatSize } from 'react-icons/md';
+import { FaExchangeAlt, FaRegKeyboard } from "react-icons/fa";
 
 
 const Toolbar = ({ 
@@ -78,6 +78,8 @@ const Toolbar = ({
   onRemoveFillers,
   onSave,
   onShowVersionHistory,
+  showFormattingToolbar,
+  onToggleFormattingToolbar,
 }) => {
   const fileInputRef = useRef(null);
   const [showPerfModal, setShowPerfModal] = useState(false);
@@ -272,6 +274,15 @@ const Toolbar = ({
       {/* Search icon */}
       <button onClick={toggleFindReplace} className="text-gray-600 p-1 hover:text-blue-500" title="Find & Replace">
         <RiFindReplaceLine size={21} />
+      </button>
+
+      {/* Custom formatting toolbar toggle */}
+      <button
+        onClick={onToggleFormattingToolbar}
+        className={`p-1 ${showFormattingToolbar ? 'text-blue-500' : 'text-gray-600 hover:text-blue-500'}`}
+        title="Custom Formatting"
+      >
+        <MdOutlineFormatSize size={21} />
       </button>
 
       {/* Download icon */}
